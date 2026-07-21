@@ -10,7 +10,9 @@ Falls back to in-memory storage if no database URL is provided (e.g. for local t
 
 import os
 import re
+import shlex
 import time
+from urllib.parse import urlparse
 from flask import Flask, request, jsonify, send_from_directory, Response
 import psycopg2
 
@@ -194,7 +196,8 @@ def get_session(kernel_id=None):
             return session_data.get(kernel_id)
         return max(session_data.values(), key=lambda x: x["created_at"])
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 def list_sessions():
@@ -238,7 +241,8 @@ def list_sessions():
             session_data.pop(k, None)
         return sorted(list(session_data.values()), key=lambda x: x["created_at"], reverse=True)
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 def save_session(hostname, kernel_id="default", gpu=None, cpu=None, ram=None, username=None, notebook=None, run_type=None, container_id=None, gcp_zone=None, container_name=None):
@@ -281,7 +285,8 @@ def save_session(hostname, kernel_id="default", gpu=None, cpu=None, ram=None, us
         print(f"Error saving to database: {e}")
         return session_data[kernel_id]
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 def clear_session(kernel_id=None):
@@ -305,7 +310,8 @@ def clear_session(kernel_id=None):
     except Exception as e:
         print(f"Error clearing database: {e}")
     finally:
-        conn.close()
+        if conn is not None:
+            conn.close()
 
 
 def check_auth(req):
@@ -314,6 +320,22 @@ def check_auth(req):
         print("ERROR: RELAY_SECRET environment variable is not set!")
         return False
     return req.headers.get("X-Relay-Secret") == secret
+
+
+def is_valid_url(url_str):
+    """Validate that the URL is well-formed and uses http/https."""
+    try:
+        parsed = urlparse(url_str)
+        return parsed.scheme in ('http', 'https') and parsed.netloc
+    except Exception:
+        return False
+
+
+def is_valid_secret(secret_str):
+    """Validate secret parameter - reject shell metacharacters."""
+    # Reject shell metacharacters and special chars that could break scripts
+    forbidden_chars = set('`$()[]{};<>|&\\"\'\\n\\r\\t ')
+    return not any(char in forbidden_chars for char in secret_str)
 
 
 @app.route("/post", methods=["POST"])
@@ -442,17 +464,30 @@ def serve_script(script_name):
     secret = request.args.get("secret")
 
     if relay_url:
-        content = re.sub(
-            r'RELAY_URL="\${RELAY_URL:-[^"]*}"',
-            f'RELAY_URL="${{RELAY_URL:-{relay_url}}}"',
-            content
-        )
+        # Validate URL format to prevent injection
+        if is_valid_url(relay_url):
+            # Use shlex.quote() to safely escape the URL for shell context
+            escaped_url = shlex.quote(relay_url)
+            content = re.sub(
+                r'RELAY_URL="\${RELAY_URL:-[^"]*}"',
+                f'RELAY_URL="${{RELAY_URL:-{escaped_url}}}"',
+                content
+            )
+        else:
+            return jsonify({"error": "invalid relay_url"}), 400
+
     if secret:
-        content = re.sub(
-            r'RELAY_SECRET="\${RELAY_SECRET:-[^"]*}"',
-            f'RELAY_SECRET="${{RELAY_SECRET:-{secret}}}"',
-            content
-        )
+        # Validate secret parameter to prevent shell injection
+        if is_valid_secret(secret):
+            # Use shlex.quote() to safely escape the secret for shell context
+            escaped_secret = shlex.quote(secret)
+            content = re.sub(
+                r'RELAY_SECRET="\${RELAY_SECRET:-[^"]*}"',
+                f'RELAY_SECRET="${{RELAY_SECRET:-{escaped_secret}}}"',
+                content
+            )
+        else:
+            return jsonify({"error": "invalid secret parameter - contains forbidden characters"}), 400
 
     return Response(content, mimetype="text/x-shellscript")
 
