@@ -416,7 +416,13 @@ def pubkey_handler():
 
 @app.route("/", methods=["GET"])
 def index():
-    return jsonify({"status": "running"}), 200
+    has_pk = bool(get_pubkey())
+    return jsonify({
+        "status": "running",
+        "info": "For info refer /info",
+        "info_md": "For LLM context refer /info.md?secret=...",
+        "public_key_uploaded": has_pk
+    }), 200
 
 
 @app.route("/health", methods=["GET"])
@@ -455,6 +461,598 @@ def serve_script(script_name):
         )
 
     return Response(content, mimetype="text/x-shellscript")
+
+
+INFO_HTML_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kaggle SSH Tunnel Relay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --card-bg: #0a0a0a;
+      --card-border: #1f1f1f;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --accent-glow: rgba(37, 99, 235, 0.2);
+      --text: #ffffff;
+      --text-muted: #888888;
+      --success: #10b981;
+      --code-bg: #050505;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 2rem 1rem;
+      min-height: 100vh;
+    }
+    .container { max-width: 900px; margin: 0 auto; }
+    
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--card-border);
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; background: linear-gradient(90deg, #60a5fa, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    
+    .secret-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      padding: 0.5rem 0.75rem;
+      border-radius: 8px;
+    }
+    .secret-bar input {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+      outline: none;
+      width: 160px;
+    }
+    .btn-sm {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-sm:hover { background: var(--accent-hover); }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 2rem;
+      width: 100%;
+      max-width: 400px;
+      box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5), 0 0 30px var(--accent-glow);
+    }
+    .modal h2 { font-size: 1.25rem; margin-bottom: 0.5rem; }
+    .modal p { color: var(--text-muted); font-size: 0.875rem; margin-bottom: 1.25rem; }
+    .modal input {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      outline: none;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal button {
+      width: 100%;
+      padding: 0.75rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .section {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .section h2 { font-size: 1.1rem; margin-bottom: 0.5rem; color: #60a5fa; }
+    .section p { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem; }
+
+    .code-block {
+      position: relative;
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      color: #e5e7eb;
+      overflow-x: auto;
+    }
+    .code-block code {
+      display: block;
+      white-space: pre-wrap;
+    }
+    .code-block:last-child { margin-bottom: 0; }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 0.75rem;
+      right: 0.75rem;
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .copy-btn:hover { background: var(--accent); border-color: var(--accent); }
+    .copy-btn.copied { background: var(--success); border-color: var(--success); }
+
+    .session-card {
+      background: var(--code-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 0.5rem; }
+    .stat-item { font-size: 0.85rem; }
+    .stat-label { color: var(--text-muted); font-size: 0.75rem; display: block; }
+    .stat-val { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+  </style>
+</head>
+<body>
+
+  <div class="modal-overlay" id="authModal">
+    <div class="modal">
+      <h2>Authentication</h2>
+      <p>Enter your <code>RELAY_SECRET</code> to unlock one-click scripts & session status.</p>
+      <input type="password" id="secretInput" placeholder="RELAY_SECRET" autocomplete="off" onkeydown="if(event.key==='Enter') saveSecret()">
+      <button onclick="saveSecret()">Unlock Scripts</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <header>
+      <h1>Kaggle SSH Tunnel Relay</h1>
+      <div style="display:flex; align-items:center; gap:0.75rem;">
+        <a id="llmContextBtn" href="#" target="_blank" class="btn-sm" style="text-decoration:none; background:rgba(255,255,255,0.06); border:1px solid var(--card-border); color:var(--text); display:inline-flex; align-items:center; gap:0.35rem;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          Open info.md
+        </a>
+        <div class="secret-bar">
+          <span style="font-size:0.8rem; color:var(--text-muted);">SECRET:</span>
+          <input type="password" id="activeSecret" readonly placeholder="••••••••">
+          <button class="btn-sm" onclick="promptSecret()">Change</button>
+        </div>
+      </div>
+    </header>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; background:var(--card-bg); border:1px solid var(--card-border); padding:0.75rem 1rem; border-radius:8px; margin-bottom:1.5rem;">
+      <span style="font-size:0.85rem; font-weight:500; color:var(--text);">Script Format:</span>
+      <div style="display:flex; gap:1rem; font-size:0.85rem;">
+        <label style="cursor:pointer; display:flex; align-items:center; gap:0.35rem;">
+          <input type="radio" name="formatMode" value="export" checked onchange="toggleFormatMode()">
+          Use <code>export</code> (RELAY_SECRET & RELAY_URL)
+        </label>
+        <label style="cursor:pointer; display:flex; align-items:center; gap:0.35rem;">
+          <input type="radio" name="formatMode" value="query" onchange="toggleFormatMode()">
+          Use <code>?secret=</code> query param
+        </label>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>1. Upload SSH Public Key (Laptop)</h2>
+      <p>Generates <code>~/.ssh/kaggle_rsa</code> locally (if missing) and uploads the public key to this relay server.</p>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this, 'code-upload')">Copy</button>
+        <code id="code-upload"></code>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>2. Start SSH Tunnel (Kaggle Cell)</h2>
+      <p>Run inside a Kaggle notebook cell to launch <code>sshd</code> and Cloudflare Tunnel.</p>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this, 'code-kaggle')">Copy</button>
+        <code id="code-kaggle"></code>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>3. Connect to Shell (Laptop)</h2>
+      <p>Fetches active tunnel endpoint and launches interactive SSH session.</p>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this, 'code-client')">Copy</button>
+        <code id="code-client"></code>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>4. Non-Interactive Scripting & Transfer (<code>kssh.sh</code>)</h2>
+      <p>Run commands non-interactively or transfer files to/from Kaggle without opening interactive SSH.</p>
+
+      <div class="sub-group">
+        <h3 style="font-size:0.95rem; margin-bottom:0.75rem; color:#60a5fa;">Direct Command Execution</h3>
+        
+        <div class="code-block">
+          <div class="code-header">Run "ls -la"</div>
+          <button class="copy-btn" onclick="copyCode(this, 'code-kssh-ls')">Copy</button>
+          <code id="code-kssh-ls"></code>
+        </div>
+
+        <div class="code-block" style="margin-top: 0.75rem;">
+          <div class="code-header">Run "pwd"</div>
+          <button class="copy-btn" onclick="copyCode(this, 'code-kssh-pwd')">Copy</button>
+          <code id="code-kssh-pwd"></code>
+        </div>
+
+        <div class="code-block" style="margin-top: 0.75rem;">
+          <div class="code-header">Run "nvidia-smi"</div>
+          <button class="copy-btn" onclick="copyCode(this, 'code-kssh-gpu')">Copy</button>
+          <code id="code-kssh-gpu"></code>
+        </div>
+      </div>
+
+      <div class="sub-group" style="margin-top: 1.25rem;">
+        <h3 style="font-size:0.95rem; margin-bottom:0.75rem; color:#60a5fa;">Direct File Transfers</h3>
+        
+        <div class="code-block">
+          <div class="code-header">Upload File (put)</div>
+          <button class="copy-btn" onclick="copyCode(this, 'code-kssh-put')">Copy</button>
+          <code id="code-kssh-put"></code>
+        </div>
+
+        <div class="code-block" style="margin-top: 0.75rem;">
+          <div class="code-header">Download File (get)</div>
+          <button class="copy-btn" onclick="copyCode(this, 'code-kssh-get')">Copy</button>
+          <code id="code-kssh-get"></code>
+        </div>
+      </div>
+
+      <div class="sub-group" style="margin-top: 1.25rem;">
+        <h3 style="font-size:0.95rem; margin-bottom:0.75rem; color:#60a5fa;">Local Helper Download</h3>
+
+        <div class="code-block">
+          <div class="code-header">Download & Run Locally</div>
+          <button class="copy-btn" onclick="copyCode(this, 'code-kssh-dl')">Copy</button>
+          <code id="code-kssh-dl"></code>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h2>Active Kernel Sessions</h2>
+      <p>Sessions currently active on this relay server.</p>
+      <div id="sessionsContainer">
+        <p style="color:var(--text-muted); font-size:0.85rem;">Loading active sessions...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const baseUrl = window.location.origin;
+
+    function getSecret() {
+      return localStorage.getItem('RELAY_SECRET') || '';
+    }
+
+    function promptSecret() {
+      document.getElementById('authModal').classList.add('active');
+      document.getElementById('secretInput').focus();
+    }
+
+    function saveSecret() {
+      const val = document.getElementById('secretInput').value.trim();
+      if (val) {
+        localStorage.setItem('RELAY_SECRET', val);
+        document.getElementById('authModal').classList.remove('active');
+        updateUI();
+      }
+    }
+
+    function toggleFormatMode() {
+      updateUI();
+    }
+
+    function copyCode(btn, elementId) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      navigator.clipboard.writeText(el.innerText).then(() => {
+        const orig = btn.innerText;
+        btn.innerText = 'Copied!';
+        btn.classList.add('copied');
+        setTimeout(() => {
+          btn.innerText = orig;
+          btn.classList.remove('copied');
+        }, 2000);
+      });
+    }
+
+    function updateUI() {
+      const secret = getSecret();
+      if (!secret) {
+        promptSecret();
+        return;
+      }
+      document.getElementById('activeSecret').value = secret;
+      const llmBtn = document.getElementById('llmContextBtn');
+      if (llmBtn) {
+        llmBtn.href = `${baseUrl}/info.md?secret=${encodeURIComponent(secret)}`;
+      }
+
+      const mode = document.querySelector('input[name="formatMode"]:checked')?.value || 'export';
+
+      const snippets = {};
+      if (mode === 'export') {
+        const expHeader = `export RELAY_SECRET="${secret}"\n`;
+        snippets['code-upload'] = `${expHeader}curl -fsSL ${baseUrl}/upload_key.sh | bash`;
+        snippets['code-kaggle'] = `!export RELAY_SECRET="${secret}"\n!curl -fsSL ${baseUrl}/kaggle_setup.sh | bash`;
+        snippets['code-client'] = `${expHeader}curl -fsSL ${baseUrl}/client.sh | bash`;
+        snippets['code-kssh-ls'] = `${expHeader}curl -fsSL ${baseUrl}/kssh.sh | bash -s run "ls -la"`;
+        snippets['code-kssh-pwd'] = `${expHeader}curl -fsSL ${baseUrl}/kssh.sh | bash -s run "pwd"`;
+        snippets['code-kssh-gpu'] = `${expHeader}curl -fsSL ${baseUrl}/kssh.sh | bash -s run "nvidia-smi"`;
+        snippets['code-kssh-put'] = `${expHeader}curl -fsSL ${baseUrl}/kssh.sh | bash -s put train.py /kaggle/working/`;
+        snippets['code-kssh-get'] = `${expHeader}curl -fsSL ${baseUrl}/kssh.sh | bash -s get /kaggle/working/out.csv .`;
+        snippets['code-kssh-dl'] = `${expHeader}curl -fsSL ${baseUrl}/kssh.sh -o kssh.sh && chmod +x kssh.sh\n./kssh.sh run "ls -la"`;
+      } else {
+        snippets['code-upload'] = `curl -fsSL ${baseUrl}/upload_key.sh?secret=${secret} | bash`;
+        snippets['code-kaggle'] = `!curl -fsSL ${baseUrl}/kaggle_setup.sh?secret=${secret} | bash`;
+        snippets['code-client'] = `curl -fsSL ${baseUrl}/client.sh?secret=${secret} | bash`;
+        snippets['code-kssh-ls'] = `export RELAY_SECRET="${secret}"\ncurl -fsSL ${baseUrl}/kssh.sh | bash -s run "ls -la"`;
+        snippets['code-kssh-pwd'] = `export RELAY_SECRET="${secret}"\ncurl -fsSL ${baseUrl}/kssh.sh | bash -s run "pwd"`;
+        snippets['code-kssh-gpu'] = `export RELAY_SECRET="${secret}"\ncurl -fsSL ${baseUrl}/kssh.sh | bash -s run "nvidia-smi"`;
+        snippets['code-kssh-put'] = `export RELAY_SECRET="${secret}"\ncurl -fsSL ${baseUrl}/kssh.sh | bash -s put train.py /kaggle/working/`;
+        snippets['code-kssh-get'] = `export RELAY_SECRET="${secret}"\ncurl -fsSL ${baseUrl}/kssh.sh | bash -s get /kaggle/working/out.csv .`;
+        snippets['code-kssh-dl'] = `curl -fsSL ${baseUrl}/kssh.sh?secret=${secret} -o kssh.sh && chmod +x kssh.sh\nexport RELAY_SECRET="${secret}"\n./kssh.sh run "ls -la"`;
+      }
+
+      Object.keys(snippets).forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = snippets[id];
+      });
+
+      fetchSessions(secret);
+    }
+
+    async function fetchSessions(secret) {
+      const container = document.getElementById('sessionsContainer');
+      try {
+        const res = await fetch(`${baseUrl}/kernels?secret=${encodeURIComponent(secret)}`);
+        if (res.status === 401) {
+          container.innerHTML = '<p style="color:#ef4444; font-size:0.85rem;">Unauthorized: Invalid secret.</p>';
+          return;
+        }
+        const data = await res.json();
+        if (!data.kernels || data.kernels.length === 0) {
+          container.innerHTML = '<p style="color:var(--text-muted); font-size:0.85rem;">No active Kaggle sessions found.</p>';
+          return;
+        }
+
+        container.innerHTML = data.kernels.map(k => `
+          <div class="session-card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.5rem;">
+              <strong style="color:#60a5fa;">${k.kernel_id || 'default'}</strong>
+              <span style="font-size:0.75rem; color:var(--text-muted);">${new Date(k.created_at * 1000).toLocaleString()}</span>
+            </div>
+            <div class="grid">
+              <div class="stat-item"><span class="stat-label">GPU</span><span class="stat-val">${k.gpu || 'None'}</span></div>
+              <div class="stat-item"><span class="stat-label">CPU</span><span class="stat-val">${k.cpu || 'N/A'}</span></div>
+              <div class="stat-item"><span class="stat-label">RAM</span><span class="stat-val">${k.ram || 'N/A'}</span></div>
+              <div class="stat-item"><span class="stat-label">Tunnel Host</span><span class="stat-val">${k.hostname}</span></div>
+            </div>
+          </div>
+        `).join('');
+      } catch (err) {
+        container.innerHTML = '<p style="color:#ef4444; font-size:0.85rem;">Failed to load sessions.</p>';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (!getSecret()) {
+        promptSecret();
+      } else {
+        updateUI();
+      }
+    });
+  </script>
+</body>
+</html>"""
+
+
+@app.route("/info", methods=["GET"])
+@app.route("/info.html", methods=["GET"])
+def info_page():
+    return Response(INFO_HTML_TEMPLATE, mimetype="text/html")
+
+
+INFO_MD_TEMPLATE = """---
+name: kaggle-terminal
+description: Manage and execute non-interactive SSH commands and file transfers to Kaggle notebook sessions over a Cloudflare Tunnel relay.
+---
+
+# Kaggle Terminal Skill
+
+Use this skill when performing tasks requiring execution of commands or transferring files to active Kaggle kernel containers.
+
+## Configuration & Environment
+
+- **Relay Server**: `{{ RELAY_URL }}`
+- **Secret**: `{{ RELAY_SECRET }}`
+
+Always set `RELAY_SECRET="{{ RELAY_SECRET }}"` in environment when running commands.
+
+---
+
+## Operations & Workflow
+
+### 1. Upload SSH Public Key (Laptop)
+Ensure public key is uploaded to relay server prior to starting tunnel:
+
+```bash
+export RELAY_SECRET="{{ RELAY_SECRET }}"
+curl -fsSL {{ RELAY_URL }}/upload_key.sh | bash
+```
+
+### 2. Start SSH Tunnel (Kaggle Notebook Cell)
+Execute inside Kaggle notebook cell to launch `sshd` and Cloudflare Tunnel:
+
+```bash
+!export RELAY_SECRET="{{ RELAY_SECRET }}"
+!curl -fsSL {{ RELAY_URL }}/kaggle_setup.sh | bash
+```
+
+### 3. Interactive Shell Connection
+Launch interactive terminal session:
+
+```bash
+export RELAY_SECRET="{{ RELAY_SECRET }}"
+curl -fsSL {{ RELAY_URL }}/client.sh | bash
+```
+
+### 4. Non-Interactive Command Execution (`kssh.sh`)
+
+#### Run Shell Commands Directly
+```bash
+export RELAY_SECRET="{{ RELAY_SECRET }}"
+curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s run "ls -la"
+curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s run "pwd"
+curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s run "nvidia-smi"
+```
+
+#### Transfer Files (Upload / Download)
+```bash
+export RELAY_SECRET="{{ RELAY_SECRET }}"
+curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s put train.py /kaggle/working/
+curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s get /kaggle/working/out.csv .
+```
+
+#### Download Local Helper Script
+```bash
+curl -fsSL {{ RELAY_URL }}/kssh.sh?secret={{ RELAY_SECRET }} -o kssh.sh && chmod +x kssh.sh
+export RELAY_SECRET="{{ RELAY_SECRET }}"
+./kssh.sh run "ls -la"
+./kssh.sh put train.py /kaggle/working/
+./kssh.sh get /kaggle/working/out.csv .
+```
+
+---
+
+## 5. Active Sessions Status
+
+{{ SESSIONS_BLOCK }}
+"""
+
+
+@app.route("/info.md", methods=["GET"])
+def info_markdown():
+    secret = request.args.get("secret")
+    if secret:
+        expected_secret = os.environ.get("RELAY_SECRET")
+        if secret != expected_secret:
+            return jsonify({
+                "error": "unauthorized",
+                "message": "Invalid secret provided. Please check your RELAY_SECRET and try again."
+            }), 401
+    elif not check_auth(request):
+        return jsonify({
+            "error": "unauthorized",
+            "message": "Authentication required. Please provide a valid secret via ?secret=... or the X-Relay-Secret header."
+        }), 401
+
+    relay_url = request.url_root.rstrip("/")
+    if request.headers.get("X-Forwarded-Proto") == "https" and relay_url.startswith("http://"):
+        relay_url = "https://" + relay_url[7:]
+
+    req_secret = secret or request.headers.get("X-Relay-Secret") or os.environ.get("RELAY_SECRET", "")
+    sessions = list_sessions()
+
+    sess_lines = []
+    if sessions:
+        sess_lines.append(f"Total Active Sessions: {len(sessions)}\n")
+        for s in sessions:
+            kid = s.get("kernel_id") or "default"
+            host = s.get("hostname", "")
+            created = s.get("created_at", "")
+            gpu = s.get("gpu") or "None"
+            cpu = s.get("cpu") or "N/A"
+            ram = s.get("ram") or "N/A"
+            user = s.get("username") or "N/A"
+            nb = s.get("notebook") or "N/A"
+            sess_lines.append(
+                f"### Kernel ID: `{kid}`\n"
+                f"- **Tunnel Host**: `{host}`\n"
+                f"- **Created At**: {created}\n"
+                f"- **GPU**: {gpu}\n"
+                f"- **CPU**: {cpu}\n"
+                f"- **RAM**: {ram}\n"
+                f"- **User / Notebook**: {user} / {nb}\n"
+            )
+        sess_block = "\n".join(sess_lines)
+    else:
+        sess_block = "*No active Kaggle sessions currently registered on relay.*"
+
+    rendered = (
+        INFO_MD_TEMPLATE
+        .replace("{{ RELAY_URL }}", relay_url)
+        .replace("{{ RELAY_SECRET }}", req_secret)
+        .replace("{{ SESSIONS_BLOCK }}", sess_block)
+    )
+
+    return Response(rendered, mimetype="text/markdown")
 
 
 if __name__ == "__main__":
