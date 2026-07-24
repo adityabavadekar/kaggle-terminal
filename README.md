@@ -64,3 +64,16 @@ Deploy to Vercel with environment variables `RELAY_SECRET` and `DATABASE_URL` (P
   # or copy directly to clipboard
   curl -fsSL https://kagglessh.vercel.app/client.sh | bash -s raw | wl-copy
   ```
+
+## Scripting (`kssh.sh`)
+
+`client.sh` opens an interactive shell. `kssh.sh` is for automation (exec commands and move files):
+
+```bash
+export RELAY_SECRET="secret"
+./kssh.sh run "nvidia-smi"                    # exec, capture stdout
+./kssh.sh put train.py /kaggle/working/       # upload
+./kssh.sh get /kaggle/working/out.csv .       # download
+```
+
+Long jobs: run under `nohup`/`setsid` and poll - the SSH channel closing kills foregrounded processes.
