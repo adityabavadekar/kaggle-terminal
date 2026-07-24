@@ -135,6 +135,14 @@ def save_pubkey(pubkey_str):
 
 
 SESSION_TTL_SECONDS = int(os.environ.get("SESSION_TTL_SECONDS", 600))
+IS_DEMO_MODE = os.environ.get("DEMO_MODE", "false").lower() in ("1", "true", "yes")
+
+@app.before_request
+def before_request():
+    if IS_DEMO_MODE:
+        allowed_paths = ["/info", "/info.md", "/", "/health"]
+        if request.path not in allowed_paths:
+            return jsonify({"error": "This relay server is running in demo mode. Only /info, /info.md, /, and /health endpoints are accessible. For more information on running your own server, please refer to the README."}), 403
 
 
 def get_session(kernel_id=None):

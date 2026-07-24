@@ -8,9 +8,9 @@ SSH into Kaggle notebooks with a single command using Cloudflare Tunnel and Verc
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fadityabavadekar%2Fkaggle-terminal&project-name=mykagglessh&repository-name=mykagglessh&env=RELAY_SECRET,DATABASE_URL&envDescription=Random+authentication+secret%2CPostgreSQL+connection+string)
 
-Requires `RELAY_SECRET` and `DATABASE_URL`. Replace `kagglessh.vercel.app` with your deployment URL.
+Requires `RELAY_SECRET` and `DATABASE_URL`. **Replace `kagglessh.vercel.app` with your deployment URL.**
 
-> See `/info` for the dashboard and `/info.md?secret=YOUR_SECRET` for LLM-friendly docs.
+Endpoints: [`/info`](https://kagglessh.vercel.app/info) (Dashboard) • [`/info.md`](https://kagglessh.vercel.app/info.md?secret=secret) (LLM Docs)
 
 ## Usage
 
