@@ -3,15 +3,22 @@
 
 set -euo pipefail
 
-log()  { printf '[ INFO ] %s\n' "$*"; }
-ok()   { printf '[  OK  ] %s\n' "$*"; }
-warn() { printf '[ WARN ] %s\n' "$*"; }
-err()  { printf '[ ERR  ] %s\n' "$*"; }
+if [[ -t 1 ]]; then
+  C_INFO=$'\033[34m'; C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'; C_OFF=$'\033[0m'
+else
+  C_INFO=""; C_OK=""; C_WARN=""; C_ERR=""; C_OFF=""
+fi
+
+log()  { printf '%s[ INFO ]%s %s\n' "$C_INFO" "$C_OFF" "$*"; }
+ok()   { printf '%s[  OK  ]%s %s\n' "$C_OK" "$C_OFF" "$*"; }
+warn() { printf '%s[ WARN ]%s %s\n' "$C_WARN" "$C_OFF" "$*"; }
+err()  { printf '%s[ ERR  ]%s %s\n' "$C_ERR" "$C_OFF" "$*"; }
 
 PUBKEY_URL=""
 RELAY_URL="${RELAY_URL:-https://kagglessh.vercel.app}"
 RELAY_SECRET="${RELAY_SECRET:-}"
-SSH_PASSWORD="${SSH_PASSWORD:-password}"
+# Random per-run fallback, used only if no pubkey is on the relay.
+SSH_PASSWORD="${SSH_PASSWORD:-}"
 KERNEL_ID="default"
 BLOCK="false"
 ACTION="start"
@@ -95,16 +102,21 @@ if [[ "$ACTION" == "stop" ]]; then
 fi
 
 log "Installing sshd..."
-apt-get update -qq
-apt-get install -y -qq openssh-server >/dev/null
+APT_LOG="$(mktemp)"
+apt-get update -qq >"$APT_LOG" 2>&1 || true
+if ! apt-get install -y -qq openssh-server >>"$APT_LOG" 2>&1; then
+  err "Failed to install openssh-server:"
+  cat "$APT_LOG" >&2
+  rm -f "$APT_LOG"
+  exit 1
+fi
+rm -f "$APT_LOG"
 mkdir -p /var/run/sshd
 
 log "Configuring SSH..."
 sed -i 's/#\?PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 sed -i 's/#\?PubkeyAuthentication.*/PubkeyAuthentication yes/' /etc/ssh/sshd_config
-sed -i 's/#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 sed -i 's/#\?PermitUserEnvironment.*/PermitUserEnvironment yes/' /etc/ssh/sshd_config
-echo "root:${SSH_PASSWORD}" | chpasswd
 
 # Preserve Kaggle NVIDIA, CUDA, PATH & LD_LIBRARY_PATH environment variables for SSH sessions
 echo "/usr/local/nvidia/lib64" > /etc/ld.so.conf.d/nvidia.conf
@@ -113,8 +125,14 @@ echo "/usr/local/cuda/lib64" >> /etc/ld.so.conf.d/nvidia.conf
 echo "/usr/lib64-nvidia" >> /etc/ld.so.conf.d/nvidia.conf
 ldconfig 2>/dev/null || true
 
-env | grep -E '^(PATH|LD_LIBRARY_PATH|NVIDIA_|CUDA_|KAGGLE_)' >> /etc/environment
-echo "LD_LIBRARY_PATH=\"/usr/local/nvidia/lib64:/usr/local/cuda/lib64:\${LD_LIBRARY_PATH:-}\"" >> /etc/environment
+# Rewritten, not appended - re-runs must not accumulate duplicates.
+sed -i '/^# kaggle-terminal env passthrough$/,/^# kaggle-terminal env end$/d' /etc/environment 2>/dev/null || true
+{
+  echo "# kaggle-terminal env passthrough"
+  env | grep -E '^(PATH|NVIDIA_|CUDA_|KAGGLE_)=' || true
+  echo "LD_LIBRARY_PATH=\"/usr/local/nvidia/lib64:/usr/local/cuda/lib64:${LD_LIBRARY_PATH:-}\""
+  echo "# kaggle-terminal env end"
+} >> /etc/environment
 grep -qF 'export LD_LIBRARY_PATH=' /root/.bashrc 2>/dev/null || echo "export LD_LIBRARY_PATH=\"/usr/local/nvidia/lib64:/usr/local/cuda/lib64:\${LD_LIBRARY_PATH:-}\"" >> /root/.bashrc
 grep -qF 'export PATH=' /root/.bashrc 2>/dev/null || echo "export PATH=\"$PATH\"" >> /root/.bashrc
 
@@ -133,8 +151,17 @@ if [[ -n "$PUBKEY_URL" ]]; then
   log "Installing public key..."
   curl -fsSL "$PUBKEY_URL" -o /root/.ssh/authorized_keys
   chmod 600 /root/.ssh/authorized_keys
+  sed -i 's/#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+  passwd -l root >/dev/null 2>&1 || true
+  ok "Public key installed. Password authentication disabled."
 else
+  if [[ -z "$SSH_PASSWORD" ]]; then
+    SSH_PASSWORD=$(head -c 18 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 20)
+  fi
+  sed -i 's/#\?PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+  echo "root:${SSH_PASSWORD}" | chpasswd
   warn "No pubkey stored on relay yet. Password auth active (password: ${SSH_PASSWORD})."
+  warn "Upload a key with upload_key.sh instead - it is picked up automatically within ~10s."
 fi
 
 # Start background pubkey sync loop (fetches key if uploaded later from laptop)
@@ -145,17 +172,36 @@ fi
       if ! cmp -s /tmp/sync_pubkey.pub /root/.ssh/authorized_keys 2>/dev/null; then
         cp /tmp/sync_pubkey.pub /root/.ssh/authorized_keys
         chmod 600 /root/.ssh/authorized_keys
+        # Key arrived late - close the password door behind it.
+        if grep -q '^PasswordAuthentication yes' /etc/ssh/sshd_config; then
+          sed -i 's/#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+          passwd -l root >/dev/null 2>&1 || true
+          service ssh reload >/dev/null 2>&1 || pkill -HUP sshd 2>/dev/null || true
+        fi
       fi
     fi
   done
 ) >/dev/null 2>&1 &
 
-service ssh start
+if ! service ssh start >/dev/null 2>&1; then
+  err "Failed to start sshd."
+  exit 1
+fi
 ok "sshd is running."
 
 log "Installing cloudflared..."
-wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -O /tmp/cloudflared.deb
-dpkg -i /tmp/cloudflared.deb >/dev/null
+if ! wget -q https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb -O /tmp/cloudflared.deb; then
+  err "Failed to download cloudflared."
+  exit 1
+fi
+DPKG_LOG="$(mktemp)"
+if ! dpkg -i /tmp/cloudflared.deb >"$DPKG_LOG" 2>&1; then
+  err "Failed to install cloudflared:"
+  cat "$DPKG_LOG" >&2
+  rm -f "$DPKG_LOG"
+  exit 1
+fi
+rm -f "$DPKG_LOG"
 
 log "Starting Cloudflare quick tunnel to localhost:22..."
 LOGFILE="/kaggle/working/cf.log"
@@ -251,7 +297,7 @@ fi
 echo ""
 echo "=================================================="
 echo " Tunnel hostname : ${HOSTNAME}"
-echo " SSH auth        : $([[ -n "$PUBKEY_URL" ]] && echo "public key" || echo "password (${SSH_PASSWORD})")"
+echo " SSH auth        : $([[ -n "$PUBKEY_URL" ]] && echo "public key (password auth disabled)" || echo "password (${SSH_PASSWORD})")"
 echo "=================================================="
 echo ""
 if [[ "$BLOCK" == "true" ]]; then

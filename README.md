@@ -24,7 +24,7 @@ Endpoints: [`/info`](https://kagglessh.vercel.app/info) (Dashboard) • [`/info.
 2. **Start SSH** (Kaggle cell):
 
    ```bash
-   export RELAY_SECRET="secret"
+   %env RELAY_SECRET=secret
    !curl -fsSL https://kagglessh.vercel.app/kaggle_setup.sh | bash
    ```
 
@@ -47,14 +47,14 @@ Endpoints: [`/info`](https://kagglessh.vercel.app/info) (Dashboard) • [`/info.
 - **Connect to custom kernel ID**:
 
   ```bash
-  export RELAY_SECRET="secret"
+  %env RELAY_SECRET=secret
   !curl -fsSL https://kagglessh.vercel.app/kaggle_setup.sh | bash -s -i kernel1
   ```
 
 - **Stop tunnel**:
 
   ```bash
-  export RELAY_SECRET="secret"
+  %env RELAY_SECRET=secret
   !curl -fsSL https://kagglessh.vercel.app/kaggle_setup.sh | bash -s stop
   ```
 
@@ -79,3 +79,7 @@ curl -fsSL https://kagglessh.vercel.app/kssh.sh | bash -s get /kaggle/working/ou
 curl -fsSL https://kagglessh.vercel.app/kssh.sh?secret=YOUR_SECRET -o kssh.sh && chmod +x kssh.sh
 ./kssh.sh run "ls -la"
 ```
+
+## License
+
+[Apache 2.0](LICENSE)

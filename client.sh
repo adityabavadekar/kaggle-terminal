@@ -3,10 +3,16 @@
 
 set -euo pipefail
 
-log()  { printf '[ INFO ] %s\n' "$*"; }
-ok()   { printf '[  OK  ] %s\n' "$*"; }
-warn() { printf '[ WARN ] %s\n' "$*"; }
-err()  { printf '[ ERR  ] %s\n' "$*"; }
+if [[ -t 1 ]]; then
+  C_INFO=$'\033[34m'; C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'; C_OFF=$'\033[0m'
+else
+  C_INFO=""; C_OK=""; C_WARN=""; C_ERR=""; C_OFF=""
+fi
+
+log()  { printf '%s[ INFO ]%s %s\n' "$C_INFO" "$C_OFF" "$*"; }
+ok()   { printf '%s[  OK  ]%s %s\n' "$C_OK" "$C_OFF" "$*"; }
+warn() { printf '%s[ WARN ]%s %s\n' "$C_WARN" "$C_OFF" "$*"; }
+err()  { printf '%s[ ERR  ]%s %s\n' "$C_ERR" "$C_OFF" "$*"; }
 
 RELAY_URL="${RELAY_URL:-https://kagglessh.vercel.app}"
 RELAY_SECRET="${RELAY_SECRET:-}"
@@ -94,19 +100,24 @@ if [[ -z "$RELAY_SECRET" ]]; then
   exit 1
 fi
 
+TMPDIR_RUN="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR_RUN"' EXIT
+RESP_FILE="${TMPDIR_RUN}/relay_resp.json"
+KERNELS_FILE="${TMPDIR_RUN}/relay_kernels.json"
+
 if [[ "$SHOW_LIST" == "true" ]]; then
   log "Fetching active Kaggle sessions..."
-  HTTP_STATUS=$(curl -s -w "%{http_code}" -o /tmp/relay_kernels.json "${RELAY_URL%/}/kernels" -H "X-Relay-Secret: ${RELAY_SECRET}" || echo "000")
+  HTTP_STATUS=$(curl -s -w "%{http_code}" -o "$KERNELS_FILE" "${RELAY_URL%/}/kernels" -H "X-Relay-Secret: ${RELAY_SECRET}" || echo "000")
   if [[ "$HTTP_STATUS" == "401" ]]; then
     err "Unauthorized (HTTP 401). Invalid RELAY_SECRET provided."
     exit 1
   elif [[ "$HTTP_STATUS" != "200" ]]; then
     err "Failed to fetch sessions (HTTP ${HTTP_STATUS})."
-    cat /tmp/relay_kernels.json >&2
+    cat "$KERNELS_FILE" >&2
     exit 1
   fi
 
-  cat /tmp/relay_kernels.json | python3 -c '
+  cat "$KERNELS_FILE" | python3 -c '
 import sys, json, datetime
 
 data = json.load(sys.stdin)
@@ -155,8 +166,8 @@ if [[ -n "$KERNEL_ID" ]]; then
   URL="${URL}?kernel_id=${KERNEL_ID}"
 fi
 
-HTTP_STATUS=$(curl -s -w "%{http_code}" -o /tmp/relay_resp.json "${URL}" -H "X-Relay-Secret: ${RELAY_SECRET}" || echo "000")
-RESP=$(cat /tmp/relay_resp.json 2>/dev/null || echo "")
+HTTP_STATUS=$(curl -s -w "%{http_code}" -o "$RESP_FILE" "${URL}" -H "X-Relay-Secret: ${RELAY_SECRET}" || echo "000")
+RESP=$(cat "$RESP_FILE" 2>/dev/null || echo "")
 
 if [[ "$HTTP_STATUS" == "401" ]]; then
   err "Unauthorized (HTTP 401). Invalid RELAY_SECRET provided."
@@ -180,6 +191,12 @@ if [[ -z "$HOSTNAME" ]]; then
   exit 1
 fi
 
+# Hostname lands in an ssh ProxyCommand, which runs via /bin/sh.
+if ! [[ "$HOSTNAME" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$ ]]; then
+  err "Refusing to use malformed tunnel hostname from relay: ${HOSTNAME}"
+  exit 1
+fi
+
 if [[ "$RAW_MODE" == "true" ]]; then
   if [[ -f "$SSH_KEY" ]]; then
     echo "ssh -o ProxyCommand=\"cloudflared access tcp --hostname ${HOSTNAME}\" -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${SSH_KEY}\" ${SSH_USER}@localhost"
@@ -187,6 +204,12 @@ if [[ "$RAW_MODE" == "true" ]]; then
     echo "ssh -o ProxyCommand=\"cloudflared access tcp --hostname ${HOSTNAME}\" -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no ${SSH_USER}@localhost"
   fi
   exit 0
+fi
+
+if ! command -v cloudflared >/dev/null 2>&1; then
+  err "cloudflared not found in PATH."
+  log "Install it from https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/"
+  exit 1
 fi
 
 # Print session specs summary
@@ -216,8 +239,17 @@ if zone: print(f"  │  Zone      {zone}")
 print(f"  └─ Tunnel    {host}")
 '
 
-# Ensure local port is free to avoid bind conflicts
-if ss -tulpn 2>/dev/null | grep -q ":${LOCAL_PORT} "; then
+# Ensure local port is free to avoid bind conflicts (ss is Linux-only)
+if ! python3 -c "
+import socket, sys
+s = socket.socket()
+try:
+    s.bind(('127.0.0.1', ${LOCAL_PORT}))
+except OSError:
+    sys.exit(1)
+finally:
+    s.close()
+" 2>/dev/null; then
   LOCAL_PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("", 0)); print(s.getsockname()[1]); s.close()')
 fi
 
@@ -227,13 +259,13 @@ cloudflared access tcp --hostname "${HOSTNAME}" --url "localhost:${LOCAL_PORT}" 
 CF_PID=$!
 
 # Clean up cloudflared on exit
-trap 'kill "$CF_PID" 2>/dev/null || true' EXIT
+trap 'kill "$CF_PID" 2>/dev/null || true; rm -rf "$TMPDIR_RUN"' EXIT
 
 # Give it a moment to bind the local port
 sleep 2
 
 log "Connecting..."
-SSH_OPTS=("-t" "-o" "RequestTTY=yes" "-o" "UserKnownHostsFile=/dev/null" "-o" "StrictHostKeyChecking=no" "-o" "LogLevel=ERROR" "-o" "PubkeyAuthentication=yes" "-o" "PasswordAuthentication=yes" "-o" "SendEnv=TERM" "-o" "SetEnv=TERM=xterm-256color")
+SSH_OPTS=("-t" "-o" "RequestTTY=yes" "-o" "UserKnownHostsFile=/dev/null" "-o" "StrictHostKeyChecking=no" "-o" "LogLevel=ERROR" "-o" "PubkeyAuthentication=yes" "-o" "SendEnv=TERM" "-o" "SetEnv=TERM=xterm-256color")
 
 set +e
 if [[ -f "$SSH_KEY" ]]; then

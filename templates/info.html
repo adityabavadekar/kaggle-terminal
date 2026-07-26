@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kaggle SSH Tunnel Relay</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b0b0c;
+      --surface: #121214;
+      --surface-2: #17171a;
+      --border: #26262b;
+      --border-strong: #35353c;
+      --text: #f4f4f5;
+      --text-muted: #9b9ba3;
+      --text-faint: #6e6e77;
+      --accent: #4f7fd4;
+      --accent-text: #a8c1ec;
+      --ok: #4a9d7a;
+      --warn: #b8935a;
+      --radius: 6px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #fbfbfc;
+        --surface: #ffffff;
+        --surface-2: #f4f4f6;
+        --border: #e0e0e4;
+        --border-strong: #c8c8ce;
+        --text: #18181b;
+        --text-muted: #5d5d66;
+        --text-faint: #86868f;
+        --accent: #2f5fb0;
+        --accent-text: #2f5fb0;
+        --ok: #2f7a5b;
+        --warn: #8a6a2f;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.55;
+      font-size: 15px;
+      padding: 2.5rem 1.25rem 4rem;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 880px; margin: 0 auto; }
+
+    a { color: var(--accent-text); }
+
+    header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 2rem;
+    }
+    .title-block h1 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+    .title-block p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      margin-top: 0.15rem;
+    }
+    .header-actions { display: flex; align-items: center; gap: 0.5rem; }
+
+    .btn {
+      font-family: inherit;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: var(--text);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.4rem 0.7rem;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .btn:hover { border-color: var(--border-strong); background: var(--surface); }
+    .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+    .btn-primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--accent); border-color: var(--accent); filter: brightness(1.08); }
+
+    .secret-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.3rem 0.3rem 0.3rem 0.6rem;
+    }
+    .secret-bar label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-faint);
+    }
+    .secret-bar input {
+      background: transparent;
+      border: none;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      outline: none;
+      width: 110px;
+    }
+
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.25rem;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 380px;
+    }
+    .modal h2 { font-size: 1.05rem; font-weight: 600; }
+    .modal p { color: var(--text-muted); font-size: 0.8125rem; margin: 0.35rem 0 1rem; }
+    .modal input {
+      width: 100%;
+      padding: 0.55rem 0.7rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+      margin-bottom: 0.75rem;
+      outline: none;
+    }
+    .modal input:focus { border-color: var(--accent); }
+    .modal input.invalid { border-color: var(--warn); }
+    .modal .btn { width: 100%; justify-content: center; padding: 0.55rem; }
+    .modal-error {
+      color: var(--warn);
+      font-size: 0.8125rem;
+      margin: -0.25rem 0 0.75rem;
+    }
+
+    .secret-state { font-size: 0.75rem; color: var(--text-faint); white-space: nowrap; }
+    .secret-state.ok { color: var(--ok); }
+    .secret-state.bad { color: var(--warn); }
+
+    .banner {
+      border: 1px solid var(--warn);
+      border-radius: var(--radius);
+      padding: 0.7rem 0.9rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.875rem;
+      color: var(--warn);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem 0.75rem;
+    }
+    .banner .btn { color: var(--text); }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.75rem 1.25rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.7rem 0.9rem;
+      margin-bottom: 2rem;
+      font-size: 0.8125rem;
+    }
+    .toolbar > span:first-child { color: var(--text-muted); }
+    .radio-group { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .radio-group label {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      cursor: pointer;
+      color: var(--text);
+    }
+    .radio-group input { accent-color: var(--accent); cursor: pointer; }
+    .hint { color: var(--text-faint); font-size: 0.75rem; }
+
+    .section { margin-bottom: 2.25rem; }
+    .section-head {
+      display: flex;
+      align-items: baseline;
+      gap: 0.6rem;
+      margin-bottom: 0.35rem;
+    }
+    .step-num {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--text-faint);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.05rem 0.4rem;
+      flex-shrink: 0;
+    }
+    .section h2 { font-size: 1rem; font-weight: 600; }
+    .section > p {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      margin-bottom: 0.9rem;
+      max-width: 68ch;
+    }
+    .section h3 {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 1.5rem 0 0.6rem;
+    }
+
+    .code-block {
+      position: relative;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 0.6rem;
+    }
+    .code-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6875rem;
+      color: var(--text-faint);
+      padding: 0.45rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .code-block pre {
+      margin: 0;
+      padding: 0.75rem 4.5rem 0.75rem 0.75rem;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      line-height: 1.6;
+      color: var(--text);
+      white-space: pre;
+      tab-size: 2;
+    }
+    .copy-btn {
+      position: absolute;
+      top: 0.4rem;
+      right: 0.5rem;
+      font-family: inherit;
+      font-size: 0.6875rem;
+      color: var(--text-muted);
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.2rem 0.45rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .code-block:has(.code-label) .copy-btn { top: 2.1rem; }
+    .copy-btn:hover { color: var(--text); border-color: var(--border-strong); }
+    .copy-btn.copied { color: var(--ok); border-color: var(--ok); }
+    code.inline {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85em;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      padding: 0.05em 0.3em;
+    }
+
+    .sessions-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.9rem;
+    }
+    .session-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.9rem;
+      margin-bottom: 0.6rem;
+    }
+    .session-top {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .kernel-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    .badge {
+      font-size: 0.6875rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.05rem 0.4rem;
+      color: var(--text-muted);
+    }
+    .badge-live { color: var(--ok); border-color: var(--ok); }
+    .badge-stale { color: var(--warn); border-color: var(--warn); }
+    .session-time { margin-left: auto; font-size: 0.75rem; color: var(--text-faint); }
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 0.75rem;
+    }
+    .stat-label {
+      display: block;
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-faint);
+    }
+    .stat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      word-break: break-word;
+    }
+    .empty-state {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+      border: 1px dashed var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .error-text { color: var(--warn); font-size: 0.875rem; }
+
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+      color: var(--text-faint);
+      font-size: 0.8125rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem 1.25rem;
+    }
+
+    @media (max-width: 600px) {
+      body { padding: 1.5rem 1rem 3rem; }
+      header { flex-direction: column; }
+      .header-actions { width: 100%; flex-wrap: wrap; }
+      .session-time { margin-left: 0; width: 100%; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="modal-overlay" id="authModal">
+    <div class="modal">
+      <h2>Enter relay secret</h2>
+      <p>Your <code class="inline">RELAY_SECRET</code> is stored in this browser only and used to fill in the commands below.</p>
+      <input type="password" id="secretInput" placeholder="RELAY_SECRET" autocomplete="off" oninput="clearModalError()" onkeydown="if(event.key==='Enter') saveSecret()">
+      <p class="modal-error" id="modalError" hidden></p>
+      <button class="btn btn-primary" id="modalSubmit" onclick="saveSecret()">Continue</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <header>
+      <div class="title-block">
+        <h1>Kaggle SSH Tunnel Relay</h1>
+        <p>SSH into a Kaggle notebook over Cloudflare Tunnel.</p>
+      </div>
+      <div class="header-actions">
+        <a id="llmContextBtn" href="#" target="_blank" rel="noopener" class="btn">info.md</a>
+        <div class="secret-bar">
+          <label for="activeSecret">Secret</label>
+          <input type="password" id="activeSecret" readonly placeholder="not set">
+          <span class="secret-state" id="secretState"></span>
+          <button class="btn" onclick="promptSecret()">Change</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="banner" id="authBanner" hidden></div>
+
+    <div class="toolbar">
+      <span>Pass the secret via</span>
+      <div class="radio-group">
+        <label><input type="radio" name="formatMode" value="export" checked onchange="updateUI()"> environment variable</label>
+        <label><input type="radio" name="formatMode" value="query" onchange="updateUI()"> URL query parameter</label>
+      </div>
+      <span class="hint" id="modeHint"></span>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="step-num">1</span><h2>Upload your SSH public key</h2></div>
+      <p>Run on the machine you will connect from. Generates <code class="inline">~/.ssh/kaggle_rsa</code> if it does not exist and stores the public half on this relay. Do this first — the notebook then uses key auth and disables password login.</p>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this,'code-upload')">Copy</button>
+        <pre><code id="code-upload"></code></pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="step-num">2</span><h2>Start the tunnel</h2></div>
+      <p>Run in a Kaggle notebook cell. Starts <code class="inline">sshd</code> and a Cloudflare quick tunnel in the background, then registers the hostname here.</p>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this,'code-kaggle')">Copy</button>
+        <pre><code id="code-kaggle"></code></pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="step-num">3</span><h2>Connect</h2></div>
+      <p>Opens an interactive shell on the notebook container.</p>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this,'code-client')">Copy</button>
+        <pre><code id="code-client"></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-label">list registered sessions</div>
+        <button class="copy-btn" onclick="copyCode(this,'code-list')">Copy</button>
+        <pre><code id="code-list"></code></pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><span class="step-num">4</span><h2>Scripting and file transfer</h2></div>
+      <p>Run commands or move files without opening an interactive session. Exit status and output pass through, so these compose with normal shell error handling.</p>
+
+      <h3>Run a command</h3>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this,'code-kssh-ls')">Copy</button>
+        <pre><code id="code-kssh-ls"></code></pre>
+      </div>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this,'code-kssh-pwd')">Copy</button>
+        <pre><code id="code-kssh-pwd"></code></pre>
+      </div>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this,'code-kssh-gpu')">Copy</button>
+        <pre><code id="code-kssh-gpu"></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-label">longer command</div>
+        <button class="copy-btn" onclick="copyCode(this,'code-kssh-train')">Copy</button>
+        <pre><code id="code-kssh-train"></code></pre>
+      </div>
+
+      <h3>Transfer files</h3>
+      <div class="code-block">
+        <div class="code-label">upload</div>
+        <button class="copy-btn" onclick="copyCode(this,'code-kssh-put')">Copy</button>
+        <pre><code id="code-kssh-put"></code></pre>
+      </div>
+      <div class="code-block">
+        <div class="code-label">download</div>
+        <button class="copy-btn" onclick="copyCode(this,'code-kssh-get')">Copy</button>
+        <pre><code id="code-kssh-get"></code></pre>
+      </div>
+      <p class="hint">Only <code class="inline">/kaggle/working</code> persists across notebook restarts.</p>
+
+      <h3>Install the helper locally</h3>
+      <div class="code-block">
+        <button class="copy-btn" onclick="copyCode(this,'code-kssh-dl')">Copy</button>
+        <pre><code id="code-kssh-dl"></code></pre>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="sessions-head">
+        <div class="section-head" style="margin:0"><h2>Registered sessions</h2></div>
+        <button class="btn" onclick="refreshSessions()">Refresh</button>
+      </div>
+      <div id="sessionsContainer">
+        <p class="hint">Loading…</p>
+      </div>
+    </div>
+
+    <footer>
+      <span>Requires <code class="inline">cloudflared</code> on the client machine.</span>
+      <span>Sessions expire after {{ SESSION_TTL }}s without a heartbeat.</span>
+    </footer>
+  </div>
+
+  <script>
+    const baseUrl = window.location.origin;
+    const SESSION_TTL = {{ SESSION_TTL }};
+
+    function getSecret() {
+      return localStorage.getItem('RELAY_SECRET') || '';
+    }
+
+    function promptSecret() {
+      document.getElementById('authModal').classList.add('active');
+      const input = document.getElementById('secretInput');
+      input.value = '';
+      input.classList.remove('invalid');
+      showModalError('');
+      input.focus();
+    }
+
+    function showModalError(msg) {
+      const el = document.getElementById('modalError');
+      el.textContent = msg;
+      el.hidden = !msg;
+    }
+
+    function clearModalError() {
+      document.getElementById('secretInput').classList.remove('invalid');
+      showModalError('');
+    }
+
+    // Returns 'ok' | 'bad' | 'unreachable'.
+    async function checkSecret(secret) {
+      try {
+        const res = await fetch(`${baseUrl}/kernels?secret=${encodeURIComponent(secret)}`);
+        if (res.status === 401) return 'bad';
+        return res.ok ? 'ok' : 'unreachable';
+      } catch (err) {
+        return 'unreachable';
+      }
+    }
+
+    async function saveSecret() {
+      const input = document.getElementById('secretInput');
+      const btn = document.getElementById('modalSubmit');
+      const val = input.value.trim();
+      if (!val) {
+        input.classList.add('invalid');
+        showModalError('Enter a secret.');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = 'Checking…';
+      const state = await checkSecret(val);
+      btn.disabled = false;
+      btn.textContent = 'Continue';
+
+      if (state === 'bad') {
+        input.classList.add('invalid');
+        input.select();
+        showModalError('That secret does not match this relay.');
+        return;
+      }
+      if (state === 'unreachable') {
+        input.classList.remove('invalid');
+        showModalError('Could not reach the relay to verify — saved anyway.');
+      } else {
+        clearModalError();
+      }
+
+      localStorage.setItem('RELAY_SECRET', val);
+      document.getElementById('authModal').classList.remove('active');
+      updateUI();
+    }
+
+    function setSecretState(state) {
+      const label = document.getElementById('secretState');
+      const banner = document.getElementById('authBanner');
+      const text = { ok: 'verified', bad: 'invalid', unreachable: 'unverified' }[state] || '';
+      label.textContent = text;
+      label.className = 'secret-state' + (state === 'ok' ? ' ok' : state === 'bad' ? ' bad' : '');
+
+      if (state === 'bad') {
+        banner.replaceChildren(
+          Object.assign(document.createElement('span'), {
+            textContent: 'The stored secret is rejected by this relay. The commands below will fail until it is corrected.',
+          }),
+          Object.assign(document.createElement('button'), {
+            className: 'btn',
+            textContent: 'Change secret',
+            onclick: promptSecret,
+          }),
+        );
+        banner.hidden = false;
+      } else {
+        banner.hidden = true;
+      }
+    }
+
+    function copyCode(btn, id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      navigator.clipboard.writeText(el.textContent).then(() => {
+        btn.textContent = 'Copied';
+        btn.classList.add('copied');
+        setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 1800);
+      });
+    }
+
+    function relativeTime(seconds) {
+      if (seconds < 60) return `${Math.max(0, Math.round(seconds))}s ago`;
+      if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+      return `${Math.round(seconds / 3600)}h ago`;
+    }
+
+    function updateUI() {
+      const secret = getSecret();
+      if (!secret) { promptSecret(); return; }
+
+      document.getElementById('activeSecret').value = secret;
+      document.getElementById('llmContextBtn').href =
+        `${baseUrl}/info.md?secret=${encodeURIComponent(secret)}`;
+
+      const mode = document.querySelector('input[name="formatMode"]:checked')?.value || 'export';
+      const q = `?secret=${encodeURIComponent(secret)}`;
+      const exp = `export RELAY_SECRET="${secret}"\n`;
+      const useQuery = mode === 'query';
+
+      document.getElementById('modeHint').textContent = useQuery
+        ? 'Query strings appear in server logs and shell history.'
+        : '';
+
+      // kssh.sh re-reads RELAY_SECRET for scp, so it always needs the export.
+      const kssh = `${exp}curl -fsSL ${baseUrl}/kssh.sh | bash -s`;
+
+      const snippets = useQuery ? {
+        'code-upload': `curl -fsSL "${baseUrl}/upload_key.sh${q}" | bash`,
+        'code-kaggle': `!curl -fsSL "${baseUrl}/kaggle_setup.sh${q}" | bash`,
+        'code-client': `curl -fsSL "${baseUrl}/client.sh${q}" | bash`,
+        'code-list':   `curl -fsSL "${baseUrl}/client.sh${q}" | bash -s list`,
+      } : {
+        'code-upload': `${exp}curl -fsSL ${baseUrl}/upload_key.sh | bash`,
+        'code-kaggle': `%env RELAY_SECRET=${secret}\n!curl -fsSL ${baseUrl}/kaggle_setup.sh | bash`,
+        'code-client': `${exp}curl -fsSL ${baseUrl}/client.sh | bash`,
+        'code-list':   `${exp}curl -fsSL ${baseUrl}/client.sh | bash -s list`,
+      };
+
+      snippets['code-kssh-ls']    = `${kssh} run "ls -la"`;
+      snippets['code-kssh-pwd']   = `${kssh} run "pwd"`;
+      snippets['code-kssh-gpu']   = `${kssh} run "nvidia-smi"`;
+      snippets['code-kssh-train'] = `${kssh} run "cd /kaggle/working && python train.py"`;
+      snippets['code-kssh-put']   = `${kssh} put train.py /kaggle/working/`;
+      snippets['code-kssh-get']   = `${kssh} get /kaggle/working/out.csv .`;
+      snippets['code-kssh-dl'] = useQuery
+        ? `curl -fsSL "${baseUrl}/kssh.sh${q}" -o kssh.sh && chmod +x kssh.sh\n${exp}./kssh.sh run "ls -la"`
+        : `${exp}curl -fsSL ${baseUrl}/kssh.sh -o kssh.sh && chmod +x kssh.sh\n./kssh.sh run "ls -la"`;
+
+      for (const [id, text] of Object.entries(snippets)) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+      }
+
+      refreshSessions();
+    }
+
+    function refreshSessions() {
+      const secret = getSecret();
+      if (secret) fetchSessions(secret);
+    }
+
+    async function fetchSessions(secret) {
+      const container = document.getElementById('sessionsContainer');
+      try {
+        const res = await fetch(`${baseUrl}/kernels?secret=${encodeURIComponent(secret)}`);
+        if (res.status === 401) {
+          setSecretState('bad');
+          container.innerHTML = '<p class="error-text">Unauthorized — the secret does not match this relay.</p>';
+          return;
+        }
+        if (!res.ok) {
+          setSecretState('unreachable');
+          container.innerHTML = `<p class="error-text">Relay returned HTTP ${res.status}.</p>`;
+          return;
+        }
+        setSecretState('ok');
+        const data = await res.json();
+        const kernels = data.kernels || [];
+        if (kernels.length === 0) {
+          container.innerHTML = '<p class="empty-state">No sessions registered. Run step 2 in a Kaggle notebook cell.</p>';
+          return;
+        }
+
+        container.replaceChildren(...kernels.map(buildSessionCard));
+      } catch (err) {
+        setSecretState('unreachable');
+        container.innerHTML = '<p class="error-text">Could not reach the relay.</p>';
+      }
+    }
+
+    // Session fields are notebook-supplied
+    function buildSessionCard(k) {
+      const card = document.createElement('div');
+      card.className = 'session-card';
+
+      const top = document.createElement('div');
+      top.className = 'session-top';
+
+      const id = document.createElement('span');
+      id.className = 'kernel-id';
+      id.textContent = k.kernel_id || 'default';
+      top.appendChild(id);
+
+      const age = k.created_at ? (Date.now() / 1000 - k.created_at) : null;
+      const badge = document.createElement('span');
+      if (age !== null && age < SESSION_TTL / 2) {
+        badge.className = 'badge badge-live';
+        badge.textContent = 'live';
+      } else {
+        badge.className = 'badge badge-stale';
+        badge.textContent = 'stale';
+      }
+      top.appendChild(badge);
+
+      if (k.run_type) {
+        const rt = document.createElement('span');
+        rt.className = 'badge';
+        rt.textContent = k.run_type;
+        top.appendChild(rt);
+      }
+
+      const time = document.createElement('span');
+      time.className = 'session-time';
+      time.textContent = age !== null
+        ? `heartbeat ${relativeTime(age)}`
+        : 'heartbeat unknown';
+      if (k.created_at) {
+        time.title = new Date(k.created_at * 1000).toLocaleString();
+      }
+      top.appendChild(time);
+      card.appendChild(top);
+
+      const stats = document.createElement('div');
+      stats.className = 'stats';
+      const fields = [
+        ['GPU', k.gpu || 'none'],
+        ['CPU', k.cpu || 'unknown'],
+        ['RAM', k.ram || 'unknown'],
+        ['Tunnel host', k.hostname || 'unknown'],
+      ];
+      if (k.notebook) fields.push(['Notebook', k.notebook]);
+      if (k.username) fields.push(['User', k.username]);
+      if (k.gcp_zone) fields.push(['Zone', k.gcp_zone]);
+
+      for (const [label, value] of fields) {
+        const item = document.createElement('div');
+        const l = document.createElement('span');
+        l.className = 'stat-label';
+        l.textContent = label;
+        const v = document.createElement('span');
+        v.className = 'stat-val';
+        v.textContent = value;
+        item.append(l, v);
+        stats.appendChild(item);
+      }
+      card.appendChild(stats);
+      return card;
+    }
+
+    window.addEventListener('DOMContentLoaded', updateUI);
+  </script>
+</body>
+</html>

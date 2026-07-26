@@ -5,10 +5,16 @@
 
 set -euo pipefail
 
-log()  { printf '[ INFO ] %s\n' "$*"; }
-ok()   { printf '[  OK  ] %s\n' "$*"; }
-warn() { printf '[ WARN ] %s\n' "$*"; }
-err()  { printf '[ ERR  ] %s\n' "$*"; }
+if [[ -t 1 ]]; then
+  C_INFO=$'\033[34m'; C_OK=$'\033[32m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'; C_OFF=$'\033[0m'
+else
+  C_INFO=""; C_OK=""; C_WARN=""; C_ERR=""; C_OFF=""
+fi
+
+log()  { printf '%s[ INFO ]%s %s\n' "$C_INFO" "$C_OFF" "$*"; }
+ok()   { printf '%s[  OK  ]%s %s\n' "$C_OK" "$C_OFF" "$*"; }
+warn() { printf '%s[ WARN ]%s %s\n' "$C_WARN" "$C_OFF" "$*"; }
+err()  { printf '%s[ ERR  ]%s %s\n' "$C_ERR" "$C_OFF" "$*"; }
 
 RELAY_URL="${RELAY_URL:-https://kagglessh.vercel.app}"
 RELAY_SECRET="${RELAY_SECRET:-}"
@@ -60,7 +66,10 @@ else
 fi
 
 log "Uploading public key (${KEY_PATH}.pub) to relay server..."
-HTTP_STATUS=$(curl -s -w "%{http_code}" -o /tmp/pubkey_resp.json -X POST "${RELAY_URL%/}/pubkey" \
+TMPDIR_RUN="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR_RUN"' EXIT
+RESP_FILE="${TMPDIR_RUN}/pubkey_resp.json"
+HTTP_STATUS=$(curl -s -w "%{http_code}" -o "$RESP_FILE" -X POST "${RELAY_URL%/}/pubkey" \
   -H "X-Relay-Secret: ${RELAY_SECRET}" \
   --data-binary "@${KEY_PATH}.pub" || echo "000")
 
@@ -68,7 +77,7 @@ if [[ "$HTTP_STATUS" == "401" ]]; then
   err "Unauthorized (HTTP 401). Invalid RELAY_SECRET provided."
   exit 1
 elif [[ "$HTTP_STATUS" != "200" ]]; then
-  RESP=$(cat /tmp/pubkey_resp.json 2>/dev/null || echo "")
+  RESP=$(cat "$RESP_FILE" 2>/dev/null || echo "")
   err "Public key upload failed (HTTP ${HTTP_STATUS}). ${RESP}"
   exit 1
 fi
