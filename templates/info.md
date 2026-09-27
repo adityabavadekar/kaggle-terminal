@@ -1,11 +1,11 @@
 ---
 name: kaggle-terminal
-description: Run shell commands and transfer files on a Kaggle notebook's container over an SSH-through-Cloudflare-Tunnel relay. Use for training runs, GPU inspection, and moving files in or out of /kaggle/working.
+description: Run shell commands and transfer files on a Kaggle or Google Colab notebook container over an SSH-through-Cloudflare-Tunnel relay. Use for training runs, GPU inspection, and moving files in or out of /kaggle/working or /content.
 ---
 
-# Kaggle Terminal
+# Kaggle & Colab Terminal
 
-This relay brokers SSH access to a Kaggle notebook container. The notebook
+This relay brokers SSH access to a Kaggle or Google Colab notebook container. The notebook
 registers its Cloudflare Tunnel hostname here; clients look it up and connect.
 
 ## Configuration
@@ -27,7 +27,7 @@ in server access logs and shell history.
 
 - `cloudflared` on the client machine ([install docs](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)).
   The client scripts fail early with a clear message if it is missing.
-- A Kaggle notebook that has run step 2 below. Sessions expire on the relay
+- A Kaggle or Google Colab notebook that has run step 2 below. Sessions expire on the relay
   after {{ SESSION_TTL }} seconds without a heartbeat; a stopped notebook
   disappears on its own.
 
@@ -53,11 +53,18 @@ login entirely.
 curl -fsSL {{ RELAY_URL }}/upload_key.sh | bash
 ```
 
-### 2. Start the tunnel (Kaggle notebook cell)
+### 2. Start the tunnel (notebook cell)
 
+**Kaggle:**
 ```bash
 %env RELAY_SECRET={{ RELAY_SECRET }}
 !curl -fsSL {{ RELAY_URL }}/kaggle_setup.sh | bash
+```
+
+**Google Colab:**
+```bash
+%env RELAY_SECRET={{ RELAY_SECRET }}
+!curl -fsSL {{ RELAY_URL }}/colab_setup.sh | bash
 ```
 
 Runs `sshd` plus a Cloudflare quick tunnel in the background and posts the
@@ -75,7 +82,8 @@ Multiple notebooks: give each one `-s -i <kernel_id>`, then pass the matching
 
 ```bash
 curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s run "nvidia-smi"
-curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s run "cd /kaggle/working && python train.py"
+curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s run "cd /kaggle/working && python train.py"  # on Kaggle
+curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s run "cd /content && python train.py"         # on Colab
 ```
 
 Exit status and stdout/stderr pass through, so this composes with normal shell
@@ -84,11 +92,12 @@ error handling.
 ### Transfer files
 
 ```bash
-curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s put train.py /kaggle/working/
-curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s get /kaggle/working/out.csv .
+# Uploads default to /kaggle/working/ on Kaggle, /content/ on Colab:
+curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s put train.py
+curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s get output.csv .
 ```
 
-Only `/kaggle/working` persists across notebook restarts — write outputs there.
+Persisted storage: `/kaggle/working` on Kaggle, `/content` (or Google Drive) on Colab.
 
 ### Interactive shell
 
@@ -109,8 +118,11 @@ export RELAY_SECRET="{{ RELAY_SECRET }}"
 ### Stop a session
 
 ```bash
-%env RELAY_SECRET={{ RELAY_SECRET }}
+# Kaggle:
 !curl -fsSL {{ RELAY_URL }}/kaggle_setup.sh | bash -s stop
+
+# Colab:
+!curl -fsSL {{ RELAY_URL }}/colab_setup.sh | bash -s stop
 ```
 
 ## Troubleshooting
@@ -124,6 +136,13 @@ export RELAY_SECRET="{{ RELAY_SECRET }}"
 - **Commands work but CUDA does not** — the setup script propagates Kaggle's
   `PATH`/`LD_LIBRARY_PATH` into SSH sessions; a login shell (`bash -lc "..."`)
   picks them up most reliably.
+
+## Long runs & preventing timeouts
+
+Kaggle interactive sessions time out after 40 minutes of idle browser time.
+- **Headless 12-Hour Runs (Recommended)**: Run `setup.sh -b` inside a Kaggle notebook and click **Save Version -> Save & Run All (Commit)**. You can turn off your laptop; it runs headless on the cloud for up to 12 hours with full GPU access.
+- **In-Browser Anti-Idle**: If keeping the browser tab open, run an IPython cell with a JavaScript mousemove/keydown keepalive interval.
+- See detailed guide: [TIMEOUT_PREVENTION.md](TIMEOUT_PREVENTION.md).
 
 ## Notes for automation
 

@@ -25,10 +25,11 @@ if [[ "$1" != "ssh" ]]; then
   }
 fi
 
-# Resolve tunnel host from relay (same endpoint client.sh uses).
+# Resolve tunnel host and platform from relay (same endpoint client.sh uses).
 url="${RELAY_URL%/}/get"; [[ -n "$KERNEL_ID" ]] && url="${url}?kernel_id=${KERNEL_ID}"
-HOST=$(curl -fsSL "$url" -H "X-Relay-Secret: ${RELAY_SECRET}" \
-  | python3 -c "import sys,json;print(json.load(sys.stdin).get('hostname',''))")
+RESP=$(curl -fsSL "$url" -H "X-Relay-Secret: ${RELAY_SECRET}")
+HOST=$(echo "$RESP" | python3 -c "import sys,json;print(json.load(sys.stdin).get('hostname',''))")
+PLATFORM=$(echo "$RESP" | python3 -c "import sys,json; k=json.load(sys.stdin); cn=(k.get('container_name') or '').lower(); rt=(k.get('run_type') or '').lower(); nb=(k.get('notebook') or '').lower(); print('colab' if ('colab' in cn or 'colab' in rt or 'colab' in nb) else 'kaggle')")
 [[ -z "$HOST" ]] && { echo "No active session on relay." >&2; exit 1; }
 
 # Hostname lands in an ssh ProxyCommand, which runs via /bin/sh.
@@ -36,6 +37,11 @@ HOST=$(curl -fsSL "$url" -H "X-Relay-Secret: ${RELAY_SECRET}" \
   echo "Refusing to use malformed tunnel hostname from relay: ${HOST}" >&2
   exit 1
 }
+
+DEFAULT_REMOTE_DIR="/kaggle/working/"
+if [[ "$PLATFORM" == "colab" ]]; then
+  DEFAULT_REMOTE_DIR="/content/"
+fi
 
 OPTS=(-o "ProxyCommand=cloudflared access tcp --hostname ${HOST}"
       -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no
@@ -45,7 +51,7 @@ OPTS=(-o "ProxyCommand=cloudflared access tcp --hostname ${HOST}"
 cmd="$1"; shift
 case "$cmd" in
   run)  ssh "${OPTS[@]}" root@localhost "$@" ;;
-  put)  src="$1"; scp -r "${OPTS[@]}" "$src" root@localhost:"${2:-/kaggle/working/}" ;;
+  put)  src="$1"; scp -r "${OPTS[@]}" "$src" root@localhost:"${2:-$DEFAULT_REMOTE_DIR}" ;;
   get)  scp -r "${OPTS[@]}" root@localhost:"$1" "${2:-.}" ;;
   ssh)  echo "ssh ${OPTS[*]} root@localhost" ;;
   *)    echo "usage: kssh.sh {run|put|get|ssh} ..." >&2; exit 1 ;;

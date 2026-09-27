@@ -1,0 +1,40 @@
+# Kaggle & Colab Terminal Relay
+
+> Connect, execute remote bash commands, and transfer files on Kaggle or Google Colab GPU notebooks over an SSH-through-Cloudflare relay.
+
+This service allows autonomous AI agents and developers to interact with Kaggle/Colab GPU runtimes without manual browser interaction.
+
+## Quick Start for Agents
+
+- **Run command on remote notebook**:
+  ```bash
+  export RELAY_SECRET="{{ RELAY_SECRET }}"
+  curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s run "nvidia-smi"
+  ```
+- **Upload file to notebook**:
+  ```bash
+  curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s put <local_file> <remote_path>
+  ```
+- **Download file from notebook**:
+  ```bash
+  curl -fsSL {{ RELAY_URL }}/kssh.sh | bash -s get <remote_path> <local_file>
+  ```
+
+## Core APIs & Documentation
+
+- [Full LLM Context]({{ RELAY_URL }}/info.md): Complete setup guide, commands, and session details in Markdown format.
+- [Active Kernels]({{ RELAY_URL }}/kernels): JSON list of active sessions with GPU/CPU/RAM specifications and real-time status.
+- [Setup Script]({{ RELAY_URL }}/setup.sh): Unified setup script for Kaggle and Google Colab environments.
+- [Client Script]({{ RELAY_URL }}/client.sh): Client script for interactive SSH shells and listing sessions.
+- [Key Upload Script]({{ RELAY_URL }}/upload_key.sh): Helper script to upload client SSH public key to the relay.
+
+## Authentication
+
+Pass the secret via the `X-Relay-Secret` HTTP header, or set `export RELAY_SECRET="{{ RELAY_SECRET }}"` in bash commands.
+
+## Preventing Timeouts for Long Agent Workflows
+
+Kaggle interactive sessions time out after 40 minutes of idle browser time.
+- **Headless 12h Runs**: Run `setup.sh -b` inside a Kaggle notebook and commit via **Save Version -> Save & Run All**. The VM runs headless on GPU for up to 12 hours with your computer completely off.
+- **In-Browser Anti-Idle**: Inject an IPython JavaScript keepalive interval in interactive mode.
+

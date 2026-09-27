@@ -1,6 +1,6 @@
 # kaggle-terminal
 
-SSH into Kaggle notebooks with a single command using Cloudflare Tunnel and Vercel Relay.
+SSH into Kaggle and Google Colab notebooks with a single command using Cloudflare Tunnel and Vercel Relay.
 
 <img src="screenshot.png" width="320" alt="Screenshot">
 
@@ -21,12 +21,19 @@ Endpoints: [`/info`](https://kagglessh.vercel.app/info) (Dashboard) • [`/info.
    curl -fsSL https://kagglessh.vercel.app/upload_key.sh | bash
    ```
 
-2. **Start SSH** (Kaggle cell):
+2. **Start SSH**:
 
-   ```bash
-   %env RELAY_SECRET=secret
-   !curl -fsSL https://kagglessh.vercel.app/kaggle_setup.sh | bash
-   ```
+   - **Kaggle cell**:
+     ```bash
+     %env RELAY_SECRET=secret
+     !curl -fsSL https://kagglessh.vercel.app/kaggle_setup.sh | bash
+     ```
+
+   - **Google Colab cell**:
+     ```bash
+     %env RELAY_SECRET=secret
+     !curl -fsSL https://kagglessh.vercel.app/colab_setup.sh | bash
+     ```
 
 3. **Connect** (Laptop):
 
@@ -47,15 +54,19 @@ Endpoints: [`/info`](https://kagglessh.vercel.app/info) (Dashboard) • [`/info.
 - **Connect to custom kernel ID**:
 
   ```bash
+  # Kaggle or Colab:
   %env RELAY_SECRET=secret
-  !curl -fsSL https://kagglessh.vercel.app/kaggle_setup.sh | bash -s -i kernel1
+  !curl -fsSL https://kagglessh.vercel.app/colab_setup.sh | bash -s -i my-kernel
   ```
 
 - **Stop tunnel**:
 
   ```bash
-  %env RELAY_SECRET=secret
+  # Kaggle:
   !curl -fsSL https://kagglessh.vercel.app/kaggle_setup.sh | bash -s stop
+
+  # Colab:
+  !curl -fsSL https://kagglessh.vercel.app/colab_setup.sh | bash -s stop
   ```
 
 - **Get raw SSH command**:
@@ -72,13 +83,17 @@ Endpoints: [`/info`](https://kagglessh.vercel.app/info) (Dashboard) • [`/info.
 ```bash
 export RELAY_SECRET="YOUR_SECRET"
 curl -fsSL https://kagglessh.vercel.app/kssh.sh | bash -s run "ls -la"            # exec, capture stdout
-curl -fsSL https://kagglessh.vercel.app/kssh.sh | bash -s put train.py /kaggle/working/   # upload
-curl -fsSL https://kagglessh.vercel.app/kssh.sh | bash -s get /kaggle/working/out.csv .    # download
+curl -fsSL https://kagglessh.vercel.app/kssh.sh | bash -s put train.py                      # upload (to /kaggle/working/ or /content/)
+curl -fsSL https://kagglessh.vercel.app/kssh.sh | bash -s get output.csv .                  # download
 
 # Download helper script locally:
 curl -fsSL https://kagglessh.vercel.app/kssh.sh?secret=YOUR_SECRET -o kssh.sh && chmod +x kssh.sh
 ./kssh.sh run "ls -la"
 ```
+
+## Long Runs & Preventing Timeouts
+
+For running overnight training or unattended agent tasks on Kaggle without hitting the 40-minute inactivity timeout, see [TIMEOUT_PREVENTION.md](TIMEOUT_PREVENTION.md) (covers 12-hour headless batch runs, in-browser anti-idle scripts, and detached tmux workflows).
 
 ## License
 

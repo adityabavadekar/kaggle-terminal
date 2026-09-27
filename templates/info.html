@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kaggle SSH Tunnel Relay</title>
+  <title>SSH Tunnel Relay</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -52,7 +52,8 @@
       padding: 2.5rem 1.25rem 4rem;
       -webkit-font-smoothing: antialiased;
     }
-    .container { max-width: 880px; margin: 0 auto; }
+    .container { max-width: 1040px; margin: 0 auto; transition: max-width 0.2s ease; }
+    .container.table-active { max-width: 920px; }
 
     a { color: var(--accent-text); }
 
@@ -215,12 +216,114 @@
     .radio-group input { accent-color: var(--accent); cursor: pointer; }
     .hint { color: var(--text-faint); font-size: 0.75rem; }
 
-    .section { margin-bottom: 2.25rem; }
+    .section {
+      margin-bottom: 2rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .section:last-of-type {
+      border-bottom: none;
+    }
+    .section.step-grid {
+      display: grid;
+      grid-template-columns: 290px 1fr;
+      gap: 1.75rem;
+      align-items: start;
+    }
+    .step-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .step-info p {
+      color: var(--text-muted);
+      font-size: 0.84rem;
+      line-height: 1.5;
+      margin: 0;
+    }
+    .step-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      min-width: 0;
+    }
+    .tunnel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.75rem;
+    }
+    .tunnel-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 0.75rem 0.85rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+    .tunnel-header {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      color: var(--text);
+    }
+    .tunnel-logo {
+      width: 18px;
+      height: 18px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .tunnel-card .code-block {
+      margin-bottom: 0;
+      background: var(--bg);
+    }
+    .code-grid-2 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 0.65rem;
+    }
+    .code-grid-2 .code-block {
+      margin-bottom: 0;
+    }
+    .key-status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--ok);
+      background: rgba(34, 197, 94, 0.08);
+      border: 1px solid rgba(34, 197, 94, 0.25);
+      border-radius: var(--radius);
+      padding: 0.25rem 0.6rem;
+      width: fit-content;
+      margin-top: 0.25rem;
+    }
+    .checkbox-tick {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 14px;
+      height: 14px;
+      background: var(--ok);
+      color: #0b0f14;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    @media (max-width: 820px) {
+      .section.step-grid {
+        grid-template-columns: 1fr;
+        gap: 0.85rem;
+      }
+    }
     .section-head {
       display: flex;
-      align-items: baseline;
+      align-items: center;
       gap: 0.6rem;
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.25rem;
     }
     .step-num {
       font-family: 'JetBrains Mono', monospace;
@@ -231,7 +334,7 @@
       padding: 0.05rem 0.4rem;
       flex-shrink: 0;
     }
-    .section h2 { font-size: 1rem; font-weight: 600; }
+    .section h2 { font-size: 1rem; font-weight: 600; margin: 0; }
     .section > p {
       color: var(--text-muted);
       font-size: 0.875rem;
@@ -244,7 +347,7 @@
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      margin: 1.5rem 0 0.6rem;
+      margin: 1rem 0 0.5rem;
     }
 
     .code-block {
@@ -325,14 +428,16 @@
       font-weight: 500;
     }
     .badge {
-      font-size: 0.6875rem;
+      font-size: 0.68rem;
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 0.05rem 0.4rem;
+      padding: 0.05rem 0.35rem;
       color: var(--text-muted);
+      font-weight: 500;
     }
-    .badge-live { color: var(--ok); border-color: var(--ok); }
-    .badge-stale { color: var(--warn); border-color: var(--warn); }
+    .badge-live { color: var(--ok); border-color: var(--ok); background: rgba(34, 197, 94, 0.08); }
+    .badge-stale { color: var(--warn); border-color: var(--warn); background: rgba(234, 179, 8, 0.08); }
+    .badge-dead { color: var(--err); border-color: var(--err); background: rgba(239, 68, 68, 0.08); }
     .session-time { margin-left: auto; font-size: 0.75rem; color: var(--text-faint); }
     .stats {
       display: grid;
@@ -360,6 +465,206 @@
       text-align: center;
     }
     .error-text { color: var(--warn); font-size: 0.875rem; }
+
+    .view-toggle {
+      display: inline-flex;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2px;
+      background: var(--surface);
+      gap: 2px;
+    }
+    .view-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 0.25rem 0.6rem;
+      border-radius: calc(var(--radius) - 2px);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .view-btn.active {
+      background: var(--surface-hover);
+      color: var(--text);
+      font-weight: 600;
+    }
+    .sessions-table-wrapper {
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+    }
+    .sessions-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75rem;
+      text-align: left;
+      table-layout: fixed;
+    }
+    .sessions-table th {
+      font-size: 0.625rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-faint);
+      padding: 0.4rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      white-space: nowrap;
+      background: rgba(255, 255, 255, 0.02);
+    }
+    .sessions-table td {
+      padding: 0.35rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .sessions-table tr:last-child td {
+      border-bottom: none;
+    }
+    .sessions-table tr:not(.session-detail-row):hover td {
+      background: var(--surface-hover);
+    }
+    .table-mono {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+    }
+    .table-id-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.45rem;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .platform-table-icon {
+      width: 16px;
+      height: 16px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .col-host {
+      width: 150px;
+      min-width: 150px;
+      max-width: 150px;
+      box-sizing: border-box;
+    }
+    .host-click-btn {
+      background: none;
+      border: none;
+      padding: 0.1rem 0.25rem;
+      margin: -0.1rem -0.25rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      max-width: 100%;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .host-click-btn:hover {
+      background: var(--surface-hover);
+      color: var(--accent-text);
+    }
+    .host-click-btn .host-text {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .host-click-btn .host-copy-icon {
+      opacity: 0.4;
+      display: flex;
+      align-items: center;
+      transition: opacity 0.15s;
+      flex-shrink: 0;
+    }
+    .host-click-btn:hover .host-copy-icon {
+      opacity: 1;
+    }
+    .host-click-btn.copied {
+      color: var(--ok);
+      background: rgba(34, 197, 94, 0.1);
+    }
+    .host-click-btn.copied .host-copy-icon {
+      display: none;
+    }
+    .action-btn-sm {
+      padding: 0.15rem 0.4rem;
+      font-size: 0.68rem;
+      cursor: pointer;
+    }
+    .kernel-id-toggle {
+      background: none;
+      border: none;
+      padding: 0.1rem 0.3rem;
+      margin: -0.1rem -0.3rem;
+      color: var(--accent-text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-radius: var(--radius);
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      text-decoration: none;
+      transition: background 0.15s, color 0.15s;
+    }
+    .kernel-id-toggle:hover {
+      background: var(--surface-hover);
+      color: #fff;
+    }
+    .kernel-id-toggle .toggle-icon {
+      font-size: 0.62rem;
+      color: var(--text-faint);
+      transition: transform 0.15s ease;
+      user-select: none;
+    }
+    .kernel-id-toggle.expanded .toggle-icon {
+      transform: rotate(90deg);
+      color: var(--accent-text);
+    }
+    .session-detail-row {
+      background: rgba(255, 255, 255, 0.015);
+    }
+    .session-detail-row td {
+      padding: 0.85rem 1.25rem 1rem !important;
+      border-bottom: 1px solid var(--border);
+      white-space: normal !important;
+    }
+    .session-detail-content {
+      border-left: 2px solid var(--accent);
+      padding-left: 1rem;
+    }
+    .session-detail-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.75rem 1.25rem;
+    }
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .detail-label {
+      font-size: 0.6875rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-faint);
+    }
+    .detail-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8125rem;
+      color: var(--text);
+      word-break: break-all;
+    }
 
     footer {
       margin-top: 3rem;
@@ -395,8 +700,8 @@
   <div class="container">
     <header>
       <div class="title-block">
-        <h1>Kaggle SSH Tunnel Relay</h1>
-        <p>SSH into a Kaggle notebook over Cloudflare Tunnel.</p>
+        <h1>SSH Tunnel Relay</h1>
+        <p>SSH into Kaggle and Google Colab notebooks over Cloudflare Tunnel.</p>
       </div>
       <div class="header-actions">
         <a id="llmContextBtn" href="#" target="_blank" rel="noopener" class="btn">info.md</a>
@@ -420,85 +725,135 @@
       <span class="hint" id="modeHint"></span>
     </div>
 
-    <div class="section">
-      <div class="section-head"><span class="step-num">1</span><h2>Upload your SSH public key</h2></div>
-      <p>Run on the machine you will connect from. Generates <code class="inline">~/.ssh/kaggle_rsa</code> if it does not exist and stores the public half on this relay. Do this first — the notebook then uses key auth and disables password login.</p>
-      <div class="code-block">
-        <button class="copy-btn" onclick="copyCode(this,'code-upload')">Copy</button>
-        <pre><code id="code-upload"></code></pre>
+    <div class="section step-grid">
+      <div class="step-info">
+        <div class="section-head">
+          <span class="step-num">1</span>
+          <h2>Upload SSH key</h2>
+        </div>
+        <p>Run on the machine you connect from. Generates <code class="inline">~/.ssh/kaggle_rsa</code> if needed and registers your public key for passwordless auth.</p>
+        <div id="keyUploadedStatus" class="key-status-pill" hidden>
+          <span class="checkbox-tick">
+            <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 8.5l3.5 3.5 6.5-7"/>
+            </svg>
+          </span>
+          <span>Public key active</span>
+        </div>
+      </div>
+      <div class="step-actions">
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this,'code-upload')">Copy</button>
+          <pre><code id="code-upload"></code></pre>
+        </div>
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-head"><span class="step-num">2</span><h2>Start the tunnel</h2></div>
-      <p>Run in a Kaggle notebook cell. Starts <code class="inline">sshd</code> and a Cloudflare quick tunnel in the background, then registers the hostname here.</p>
-      <div class="code-block">
-        <button class="copy-btn" onclick="copyCode(this,'code-kaggle')">Copy</button>
-        <pre><code id="code-kaggle"></code></pre>
+    <div class="section step-grid">
+      <div class="step-info">
+        <div class="section-head">
+          <span class="step-num">2</span>
+          <h2>Start the tunnel</h2>
+        </div>
+        <p>Run in a notebook cell. Starts <code class="inline">sshd</code> and a Cloudflare quick tunnel in the background, then registers the session here.</p>
+      </div>
+      <div class="step-actions">
+        <div class="tunnel-grid">
+          <div class="tunnel-card">
+            <div class="tunnel-header">
+              <img id="imgKaggleHeader" class="tunnel-logo" alt="Kaggle">
+              <span>Kaggle notebook</span>
+            </div>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this,'code-kaggle')">Copy</button>
+              <pre><code id="code-kaggle"></code></pre>
+            </div>
+          </div>
+          <div class="tunnel-card">
+            <div class="tunnel-header">
+              <img id="imgColabHeader" class="tunnel-logo" alt="Colab">
+              <span>Google Colab</span>
+            </div>
+            <div class="code-block">
+              <button class="copy-btn" onclick="copyCode(this,'code-colab')">Copy</button>
+              <pre><code id="code-colab"></code></pre>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-head"><span class="step-num">3</span><h2>Connect</h2></div>
-      <p>Opens an interactive shell on the notebook container.</p>
-      <div class="code-block">
-        <button class="copy-btn" onclick="copyCode(this,'code-client')">Copy</button>
-        <pre><code id="code-client"></code></pre>
+    <div class="section step-grid">
+      <div class="step-info">
+        <div class="section-head">
+          <span class="step-num">3</span>
+          <h2>Connect</h2>
+        </div>
+        <p>Opens an interactive shell on the notebook container, or list registered sessions.</p>
       </div>
-      <div class="code-block">
-        <div class="code-label">list registered sessions</div>
-        <button class="copy-btn" onclick="copyCode(this,'code-list')">Copy</button>
-        <pre><code id="code-list"></code></pre>
+      <div class="step-actions">
+        <div class="code-block">
+          <button class="copy-btn" onclick="copyCode(this,'code-client')">Copy</button>
+          <pre><code id="code-client"></code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-label">list registered sessions</div>
+          <button class="copy-btn" onclick="copyCode(this,'code-list')">Copy</button>
+          <pre><code id="code-list"></code></pre>
+        </div>
       </div>
     </div>
 
-    <div class="section">
-      <div class="section-head"><span class="step-num">4</span><h2>Scripting and file transfer</h2></div>
-      <p>Run commands or move files without opening an interactive session. Exit status and output pass through, so these compose with normal shell error handling.</p>
-
-      <h3>Run a command</h3>
-      <div class="code-block">
-        <button class="copy-btn" onclick="copyCode(this,'code-kssh-ls')">Copy</button>
-        <pre><code id="code-kssh-ls"></code></pre>
+    <div class="section step-grid">
+      <div class="step-info">
+        <div class="section-head">
+          <span class="step-num">4</span>
+          <h2>Scripting &amp; Files</h2>
+        </div>
+        <p>Run commands or transfer files without opening an interactive session. Output and exit status pass through directly.</p>
+        <p class="hint" style="margin-top:0.35rem;">Storage: <code class="inline">/kaggle/working</code> on Kaggle, <code class="inline">/content</code> on Colab.</p>
       </div>
-      <div class="code-block">
-        <button class="copy-btn" onclick="copyCode(this,'code-kssh-pwd')">Copy</button>
-        <pre><code id="code-kssh-pwd"></code></pre>
-      </div>
-      <div class="code-block">
-        <button class="copy-btn" onclick="copyCode(this,'code-kssh-gpu')">Copy</button>
-        <pre><code id="code-kssh-gpu"></code></pre>
-      </div>
-      <div class="code-block">
-        <div class="code-label">longer command</div>
-        <button class="copy-btn" onclick="copyCode(this,'code-kssh-train')">Copy</button>
-        <pre><code id="code-kssh-train"></code></pre>
-      </div>
-
-      <h3>Transfer files</h3>
-      <div class="code-block">
-        <div class="code-label">upload</div>
-        <button class="copy-btn" onclick="copyCode(this,'code-kssh-put')">Copy</button>
-        <pre><code id="code-kssh-put"></code></pre>
-      </div>
-      <div class="code-block">
-        <div class="code-label">download</div>
-        <button class="copy-btn" onclick="copyCode(this,'code-kssh-get')">Copy</button>
-        <pre><code id="code-kssh-get"></code></pre>
-      </div>
-      <p class="hint">Only <code class="inline">/kaggle/working</code> persists across notebook restarts.</p>
-
-      <h3>Install the helper locally</h3>
-      <div class="code-block">
-        <button class="copy-btn" onclick="copyCode(this,'code-kssh-dl')">Copy</button>
-        <pre><code id="code-kssh-dl"></code></pre>
+      <div class="step-actions">
+        <div class="code-grid-2">
+          <div class="code-block">
+            <div class="code-label">run command (ls)</div>
+            <button class="copy-btn" onclick="copyCode(this,'code-kssh-ls')">Copy</button>
+            <pre><code id="code-kssh-ls"></code></pre>
+          </div>
+          <div class="code-block">
+            <div class="code-label">check gpu (nvidia-smi)</div>
+            <button class="copy-btn" onclick="copyCode(this,'code-kssh-gpu')">Copy</button>
+            <pre><code id="code-kssh-gpu"></code></pre>
+          </div>
+          <div class="code-block">
+            <div class="code-label">upload file</div>
+            <button class="copy-btn" onclick="copyCode(this,'code-kssh-put')">Copy</button>
+            <pre><code id="code-kssh-put"></code></pre>
+          </div>
+          <div class="code-block">
+            <div class="code-label">download file</div>
+            <button class="copy-btn" onclick="copyCode(this,'code-kssh-get')">Copy</button>
+            <pre><code id="code-kssh-get"></code></pre>
+          </div>
+        </div>
+        <div class="code-block">
+          <div class="code-label">install helper locally</div>
+          <button class="copy-btn" onclick="copyCode(this,'code-kssh-dl')">Copy</button>
+          <pre><code id="code-kssh-dl"></code></pre>
+        </div>
       </div>
     </div>
 
     <div class="section">
       <div class="sessions-head">
         <div class="section-head" style="margin:0"><h2>Registered sessions</h2></div>
-        <button class="btn" onclick="refreshSessions()">Refresh</button>
+        <div style="display:flex;gap:0.5rem;align-items:center;">
+          <div class="view-toggle">
+            <button id="viewBtnCards" class="view-btn active" onclick="setViewMode('cards')">Cards</button>
+            <button id="viewBtnTable" class="view-btn" onclick="setViewMode('table')">Table</button>
+          </div>
+          <button class="btn" onclick="refreshSessions()">Refresh</button>
+        </div>
       </div>
       <div id="sessionsContainer">
         <p class="hint">Loading…</p>
@@ -624,6 +979,82 @@
       return `${Math.round(seconds / 3600)}h ago`;
     }
 
+    function formatGpuCompact(gpu) {
+      if (!gpu || gpu.toLowerCase().includes('none') || gpu.toLowerCase().includes('no gpu') || gpu === '—' || gpu === 'N/A') return 'None';
+
+      let count = 1;
+
+      // 1. Check for explicit multiplier in string, e.g. "2x T4", "2 x Tesla T4", "T4 x 2", "GPU T4 x 2", "2 T4s"
+      const multiMatch = gpu.match(/(?:^|\s|\()(\d+)\s*[xX](?:\s|\)|\b)/i) ||
+                         gpu.match(/(?:^|\s|\()[xX]\s*(\d+)(?:\s|\)|\b)/i) ||
+                         gpu.match(/(?:^|\s)(\d+)\s*(?:devices?|gpus?)\b/i) ||
+                         gpu.match(/^(\d+)\s+(?:Tesla|NVIDIA|GPU\s+)?(?:T4|P100|V100|A100|L4|H100|RTX)/i);
+      if (multiMatch) {
+        count = parseInt(multiMatch[1], 10);
+      }
+
+      // 2. Split by newline or semicolon if present
+      let entries = gpu.split(/[\r\n;]+/).map(s => s.trim()).filter(Boolean);
+
+      // 3. If single entry but has commas, check if multiple devices: e.g. "Tesla T4, 15360 MiB,Tesla T4, 15360 MiB"
+      if (entries.length === 1 && gpu.includes(',')) {
+        const parts = gpu.split(',').map(s => s.trim()).filter(Boolean);
+        const isMem = (s) => /^\d+\s*(?:MiB|GiB|GB|MB)$/i.test(s);
+        if (parts.length >= 4 && isMem(parts[1]) && isMem(parts[3])) {
+          entries = [];
+          for (let i = 0; i < parts.length; i += 2) {
+            entries.push(parts[i] + (parts[i+1] ? ', ' + parts[i+1] : ''));
+          }
+        } else if (parts.length > 1 && parts.every(p => !isMem(p))) {
+          entries = parts;
+        }
+      }
+
+      if (entries.length > 1) {
+        count = Math.max(count, entries.length);
+      }
+
+      let first = entries[0] || gpu;
+      let name = first.split(',')[0].trim();
+
+      // Strip count and prefixes/suffixes from model name
+      name = name
+        .replace(/(?:^|\s|\()(\d+)\s*[xX](?:\s|\)|\b)/gi, '')
+        .replace(/(?:^|\s|\()[xX]\s*(\d+)(?:\s|\)|\b)/gi, '')
+        .replace(/^(\d+)\s+/g, '')
+        .replace(/^(?:NVIDIA\s+|Tesla\s+|GPU\s+)+/i, '')
+        .replace(/-(SXM\d*|PCIE)(-\d+GB)?/i, '')
+        .replace(/\b(T4|P100|V100|A100|L4|H100|P4|K80|M60)s\b/gi, '$1')
+        .trim();
+
+      // Memory detection
+      let mem = '';
+      const mibMatch = first.match(/(\d+)\s*MiB/i) || gpu.match(/(\d+)\s*MiB/i);
+      const gbMatch = first.match(/(\d+)\s*(?:GB|GiB)/i) || gpu.match(/(\d+)\s*(?:GB|GiB)/i);
+      if (mibMatch) {
+        let val = parseInt(mibMatch[1], 10);
+        mem = ` · ${Math.round(val / 1024)} GB`;
+      } else if (gbMatch) {
+        mem = ` · ${gbMatch[1]} GB`;
+      }
+
+      const prefix = count > 1 ? `${count}x ` : '';
+      return `${prefix}${name}${mem}`;
+    }
+
+    function formatCpuCompact(cpu) {
+      if (!cpu || cpu === 'N/A' || cpu === 'unknown' || cpu === '—') return '—';
+      const m = cpu.match(/\((\d+)\s*cores?\)/i) || cpu.match(/(\d+)\s*cores?/i);
+      if (m) {
+        return `${m[1]} vCPU`;
+      }
+      return cpu;
+    }
+
+    const ICON_COLAB = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAACXBIWXMAAAsTAAALEwEAmpwYAAADyElEQVR4nO2YyW5cRRSGP7KIWIQwiDEMQeIJEOIV2DOFAA8ACmzY22k7kqPEU7sb2xBFIQwSKN5gV1kGiSGCgEBAWMASwo4oSIBslG7f67j7oFO+bfdU1fd29yKL+0tHV5ZLp/6/6gx1GnLkyJEjR44cNzlkmdtkhSNi+EAsl8VwVQxbYrkmhl/Fcl4sL8saB/vyZYmT72WxvC+rPK/rBif+KXeJZUoMm2KRnmbYcOvXuGdgX5aqGE7LKnf2R37nlP5NuVm7/SWrPDMUX4Z/xPJceuIF9onhhBjqfZJvWEmEW8QyPrAvQ10MBfXXU0BU5Mu4NBBx3fCqfMbtjvxghyAN234XiYp8HiQfl5itjCKVESQuOyL9Cng2CZv6sMhXlNcoEpeY7kp+8y0erRSoK/mGxfN9bbimiZfE7sDkb7yzx8dZgfrmGR7rDJ0ZfmhZmNjWQsvJfi2GF2SZQ7LEfve1HBXLpeT/12WVw67a9L6lVl+WB1t8KflznXzUomm+a03c89xfOd59sbuJt6mJ4dVg8hteE8Mbrs6HSqXhRgpfx7bOUmuEc4cdR+Qs97XGvoe8U1zio2DyNG+usR8++SD5BqIiF0KcWnIhmuKKb2F1gnUyIOmwPvJfZfFVPcmG91Cn+H1v4QQVr9IyxUwCLD97BaxwJIuvuEw5cLDXdxdWxtj2Cljk8UwCdt403QUscyiLr61FnvCG0RjbewJ8yTKCyDwHMgnQh5lPwBL7M/kqcdArYBTZEzBO7aa8gTM8meoGeuRAOaOAnwJV6GgWX9Eci6lyIDrNH96FJ9kYWhWyXErtp8C+6gT/papCcZmZYB8ociH1xjqMhPvAsTR+4hJLwT4wx1T6TrzgOrF34+TZ/LoYXnGdWIeR7uS1KdZ6HUis5AOFpaMTK6IZvveQbybxjazwoqzxkHu/6Nfwkhi+TQiuyyc84CapLuTjudbQjIu8qYmqlU6/UZn5UNjsRsRs21tIUZ3ncNfXaPYn9YfyMXeI5W8f+YFsjFp1gYd9Vze9Ow/0R75B+CkdA908sOJObDjkR11VPBVMnmiWiwMNMzv2m1zkVlnmRDQzJPIjrph8ESTfNBMXhjBNjWty6xgYTMiRdCev5JVbTwG7QnQsbI7jbHZNLE83heZke36ltgL1nmHjFaHJaDjlLYudsb8ulkkx3N3uqzrHIzpJhcp1pa1UarXxJmwmIUscSJLyPTH8KJY/m36Z+0UM51w5TfPL3CL3arGIJrmizwH3EtYQG2Nb/9YOq02qo87nyJEjR44cOXIwdPwP3P16q2mQhk0AAAAASUVORK5CYII=";
+
+    const ICON_KAGGLE = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48cGF0aCBmaWxsPSIjMjBiZWZmIiBkPSJNMTAwLjQwMiAxMjcuMjQzYy0uMTI2LjUwMS0uNjI3Ljc1Mi0xLjUwMi43NTJIODIuMTY4Yy0xLjAwNyAwLTEuODc2LS40MzgtMi42MzItMS4zMTdMNTEuOTEgOTEuNTMxbC03LjcwNiA3LjMzdjI3LjI1OGMwIDEuMjU1LS42MjggMS44ODEtMS44OCAxLjg4MWgtMTIuOTdjLTEuMjU0IDAtMS44OC0uNjI2LTEuODgtMS44OFYxLjg3NmMwLTEuMjUuNjI1LTEuODc3IDEuODgtMS44NzdoMTIuOTdjMS4yNTMgMCAxLjg4Mi42MjggMS44ODIgMS44NzZ2NzYuNTAxbDMzLjA4LTMzLjQ1N2MuODc4LS44NzUgMS43NTUtMS4zMTUgMi42MzEtMS4zMTVoMTcuMjk1Yy43NSAwIDEuMjUuMzE1IDEuNTA0LjkzNy4yNTIuNzUzLjE5IDEuMzE2LS4xOSAxLjY5M0w2My41NjEgODAuMDYybDM2LjQ2NSA0NS4zYy40OTkuNTAyLjYyNSAxLjEyOC4zOCAxLjg4MSIvPjwvc3ZnPgo=";
+
     function updateUI() {
       const secret = getSecret();
       if (!secret) { promptSecret(); return; }
@@ -631,6 +1062,11 @@
       document.getElementById('activeSecret').value = secret;
       document.getElementById('llmContextBtn').href =
         `${baseUrl}/info.md?secret=${encodeURIComponent(secret)}`;
+
+      const imgKaggle = document.getElementById('imgKaggleHeader');
+      if (imgKaggle) imgKaggle.src = ICON_KAGGLE;
+      const imgColab = document.getElementById('imgColabHeader');
+      if (imgColab) imgColab.src = ICON_COLAB;
 
       const mode = document.querySelector('input[name="formatMode"]:checked')?.value || 'export';
       const q = `?secret=${encodeURIComponent(secret)}`;
@@ -647,21 +1083,21 @@
       const snippets = useQuery ? {
         'code-upload': `curl -fsSL "${baseUrl}/upload_key.sh${q}" | bash`,
         'code-kaggle': `!curl -fsSL "${baseUrl}/kaggle_setup.sh${q}" | bash`,
+        'code-colab':  `!curl -fsSL "${baseUrl}/colab_setup.sh${q}" | bash`,
         'code-client': `curl -fsSL "${baseUrl}/client.sh${q}" | bash`,
         'code-list':   `curl -fsSL "${baseUrl}/client.sh${q}" | bash -s list`,
       } : {
         'code-upload': `${exp}curl -fsSL ${baseUrl}/upload_key.sh | bash`,
         'code-kaggle': `%env RELAY_SECRET=${secret}\n!curl -fsSL ${baseUrl}/kaggle_setup.sh | bash`,
+        'code-colab':  `%env RELAY_SECRET=${secret}\n!curl -fsSL ${baseUrl}/colab_setup.sh | bash`,
         'code-client': `${exp}curl -fsSL ${baseUrl}/client.sh | bash`,
         'code-list':   `${exp}curl -fsSL ${baseUrl}/client.sh | bash -s list`,
       };
 
-      snippets['code-kssh-ls']    = `${kssh} run "ls -la"`;
-      snippets['code-kssh-pwd']   = `${kssh} run "pwd"`;
-      snippets['code-kssh-gpu']   = `${kssh} run "nvidia-smi"`;
-      snippets['code-kssh-train'] = `${kssh} run "cd /kaggle/working && python train.py"`;
-      snippets['code-kssh-put']   = `${kssh} put train.py /kaggle/working/`;
-      snippets['code-kssh-get']   = `${kssh} get /kaggle/working/out.csv .`;
+      snippets['code-kssh-ls']  = `${kssh} run "ls -la"`;
+      snippets['code-kssh-gpu'] = `${kssh} run "nvidia-smi"`;
+      snippets['code-kssh-put'] = `${kssh} put train.py /kaggle/working/`;
+      snippets['code-kssh-get'] = `${kssh} get /kaggle/working/out.csv .`;
       snippets['code-kssh-dl'] = useQuery
         ? `curl -fsSL "${baseUrl}/kssh.sh${q}" -o kssh.sh && chmod +x kssh.sh\n${exp}./kssh.sh run "ls -la"`
         : `${exp}curl -fsSL ${baseUrl}/kssh.sh -o kssh.sh && chmod +x kssh.sh\n./kssh.sh run "ls -la"`;
@@ -671,12 +1107,48 @@
         if (el) el.textContent = text;
       }
 
+      setViewMode(currentViewMode);
       refreshSessions();
+      startPolling();
     }
+
+    let pollTimer = null;
+    function startPolling() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(() => {
+        if (!document.hidden) {
+          refreshSessions();
+        }
+      }, 5000);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        refreshSessions();
+      }
+    });
 
     function refreshSessions() {
       const secret = getSecret();
       if (secret) fetchSessions(secret);
+    }
+
+    let currentViewMode = localStorage.getItem('RELAY_VIEW_MODE') || 'cards';
+    let latestKernelsCache = [];
+
+    const expandedKernelIds = new Set();
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      localStorage.setItem('RELAY_VIEW_MODE', mode);
+      document.getElementById('viewBtnCards')?.classList.toggle('active', mode === 'cards');
+      document.getElementById('viewBtnTable')?.classList.toggle('active', mode === 'table');
+      document.querySelector('.container')?.classList.toggle('table-active', mode === 'table');
+      if (latestKernelsCache.length > 0) {
+        const container = document.getElementById('sessionsContainer');
+        container.innerHTML = '';
+        renderSessionList(container, latestKernelsCache);
+      }
     }
 
     async function fetchSessions(secret) {
@@ -696,15 +1168,404 @@
         setSecretState('ok');
         const data = await res.json();
         const kernels = data.kernels || [];
+        latestKernelsCache = kernels;
+
+        if (data.public_key_uploaded !== undefined) {
+          const pill = document.getElementById('keyUploadedStatus');
+          if (pill) pill.hidden = !data.public_key_uploaded;
+        }
+
         if (kernels.length === 0) {
-          container.innerHTML = '<p class="empty-state">No sessions registered. Run step 2 in a Kaggle notebook cell.</p>';
+          container.innerHTML = '<p class="empty-state">No sessions registered. Run step 2 in a Kaggle or Google Colab notebook cell.</p>';
           return;
         }
 
-        container.replaceChildren(...kernels.map(buildSessionCard));
+        // Stable sorting:
+        // 1. Status: alive (0) -> stale (1) -> dead (2)
+        // 2. Kernel ID: alphabetical ascending
+        const statusWeight = (s) => (s === 'alive' ? 0 : s === 'stale' ? 1 : 2);
+        kernels.sort((a, b) => {
+          const swA = statusWeight(a.status || 'alive');
+          const swB = statusWeight(b.status || 'alive');
+          if (swA !== swB) return swA - swB;
+          return String(a.kernel_id || 'default').localeCompare(String(b.kernel_id || 'default'));
+        });
+
+        // Remove empty state message if present
+        if (container.querySelector('.empty-state, .error-text')) {
+          container.innerHTML = '';
+        }
+
+        renderSessionList(container, kernels);
       } catch (err) {
         setSecretState('unreachable');
         container.innerHTML = '<p class="error-text">Could not reach the relay.</p>';
+      }
+    }
+
+    function renderSessionList(container, kernels) {
+      if (currentViewMode === 'table') {
+        renderTableView(container, kernels);
+      } else {
+        renderCardsView(container, kernels);
+      }
+    }
+
+    function renderCardsView(container, kernels) {
+      if (container.querySelector('.sessions-table-wrapper')) {
+        container.innerHTML = '';
+      }
+
+      const existingCards = new Map();
+      for (const el of container.querySelectorAll('.session-card')) {
+        const kid = el.getAttribute('data-kernel-id');
+        if (kid) existingCards.set(kid, el);
+      }
+
+      const currentKids = new Set(kernels.map(k => k.kernel_id || 'default'));
+      for (const [kid, el] of existingCards.entries()) {
+        if (!currentKids.has(kid)) {
+          el.remove();
+          existingCards.delete(kid);
+        }
+      }
+
+      const targetCards = [];
+      for (const k of kernels) {
+        const kid = k.kernel_id || 'default';
+        let card = existingCards.get(kid);
+        if (!card) {
+          card = buildSessionCard(k);
+          card.setAttribute('data-kernel-id', kid);
+        } else {
+          updateSessionCard(card, k);
+        }
+        targetCards.push(card);
+      }
+
+      const currentChildren = Array.from(container.children);
+      const needsReorder = currentChildren.length !== targetCards.length ||
+        targetCards.some((el, i) => currentChildren[i] !== el);
+
+      if (needsReorder) {
+        container.replaceChildren(...targetCards);
+      }
+    }
+
+    function renderTableView(container, kernels) {
+      if (container.querySelector('.session-card')) {
+        container.innerHTML = '';
+      }
+
+      let wrapper = container.querySelector('.sessions-table-wrapper');
+      if (!wrapper) {
+        container.innerHTML = `
+          <div class="sessions-table-wrapper">
+            <table class="sessions-table">
+              <thead>
+                <tr>
+                  <th style="width: 62px;">Status</th>
+                  <th style="width: 145px;">Kernel ID</th>
+                  <th style="width: 105px;">GPU</th>
+                  <th style="width: 55px;">CPU</th>
+                  <th style="width: 48px;">RAM</th>
+                  <th style="width: 150px;">Tunnel Host</th>
+                  <th style="width: 72px;">Heartbeat</th>
+                  <th style="width: 68px;">Action</th>
+                </tr>
+              </thead>
+              <tbody id="sessionsTableBody"></tbody>
+            </table>
+          </div>`;
+        wrapper = container.querySelector('.sessions-table-wrapper');
+      }
+
+      const tbody = wrapper.querySelector('#sessionsTableBody');
+      const existingMainRows = new Map();
+      const existingDetailRows = new Map();
+
+      for (const row of tbody.querySelectorAll('tr[data-kernel-id]')) {
+        const kid = row.getAttribute('data-kernel-id');
+        if (kid) existingMainRows.set(kid, row);
+      }
+      for (const row of tbody.querySelectorAll('tr[data-detail-id]')) {
+        const kid = row.getAttribute('data-detail-id');
+        if (kid) existingDetailRows.set(kid, row);
+      }
+
+      const currentKids = new Set(kernels.map(k => k.kernel_id || 'default'));
+      for (const [kid, row] of existingMainRows.entries()) {
+        if (!currentKids.has(kid)) {
+          row.remove();
+          existingMainRows.delete(kid);
+        }
+      }
+      for (const [kid, row] of existingDetailRows.entries()) {
+        if (!currentKids.has(kid)) {
+          row.remove();
+          existingDetailRows.delete(kid);
+        }
+      }
+
+      const targetRows = [];
+      for (const k of kernels) {
+        const kid = k.kernel_id || 'default';
+        let mainRow = existingMainRows.get(kid);
+        let detailRow = existingDetailRows.get(kid);
+        if (!mainRow || !detailRow) {
+          const pair = buildTableRowPair(k);
+          mainRow = pair[0];
+          detailRow = pair[1];
+        } else {
+          updateTableRowPair(mainRow, detailRow, k);
+        }
+        targetRows.push(mainRow, detailRow);
+      }
+
+      const currentRows = Array.from(tbody.children);
+      const needsReorder = currentRows.length !== targetRows.length ||
+        targetRows.some((el, i) => currentRows[i] !== el);
+
+      if (needsReorder) {
+        tbody.replaceChildren(...targetRows);
+      }
+    }
+
+    function buildTableRowPair(k) {
+      const kid = k.kernel_id || 'default';
+      const lastSeen = k.updated_at || k.created_at;
+      const age = lastSeen ? (Date.now() / 1000 - lastSeen) : null;
+      const isColab = (k.container_name && k.container_name.toLowerCase().includes('colab')) ||
+        (k.run_type && k.run_type.toLowerCase().includes('colab')) ||
+        (k.notebook && k.notebook.toLowerCase().includes('colab'));
+      const plat = isColab ? 'Colab' : 'Kaggle';
+      const platIcon = isColab ? ICON_COLAB : ICON_KAGGLE;
+
+      // 1. Main Row
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-kernel-id', kid);
+
+      const tdStatus = document.createElement('td');
+      const badge = document.createElement('span');
+      updateCardStatus(badge, age);
+      tdStatus.appendChild(badge);
+
+      const tdId = document.createElement('td');
+      const idWrap = document.createElement('div');
+      idWrap.className = 'table-id-cell';
+
+      const iconImg = document.createElement('img');
+      iconImg.className = 'platform-table-icon';
+      iconImg.src = platIcon;
+      iconImg.alt = plat;
+      iconImg.title = `${plat} notebook`;
+
+      const btnToggle = document.createElement('button');
+      btnToggle.className = 'kernel-id-toggle' + (expandedKernelIds.has(kid) ? ' expanded' : '');
+      btnToggle.title = 'Click to show/hide session details';
+      btnToggle.setAttribute('aria-expanded', expandedKernelIds.has(kid) ? 'true' : 'false');
+
+      const icon = document.createElement('span');
+      icon.className = 'toggle-icon';
+      icon.textContent = '▶';
+
+      const label = document.createElement('span');
+      label.textContent = kid;
+
+      btnToggle.append(icon, label);
+      idWrap.append(iconImg, btnToggle);
+      tdId.appendChild(idWrap);
+
+      const tdGpu = document.createElement('td');
+      tdGpu.className = 'table-mono';
+      tdGpu.textContent = formatGpuCompact(k.gpu);
+
+      const tdCpu = document.createElement('td');
+      tdCpu.textContent = formatCpuCompact(k.cpu);
+
+      const tdRam = document.createElement('td');
+      tdRam.textContent = k.ram || '—';
+
+      const tdHost = document.createElement('td');
+      tdHost.className = 'table-mono col-host';
+
+      const fullHost = k.hostname || 'unknown';
+      const shortHost = fullHost.replace(/\.trycloudflare\.com$/i, '');
+
+      const hostBtn = document.createElement('button');
+      hostBtn.className = 'host-click-btn';
+      hostBtn.title = `Click to copy: ${fullHost}`;
+
+      const hostSpan = document.createElement('span');
+      hostSpan.className = 'host-text';
+      hostSpan.textContent = shortHost;
+
+      const copyIcon = document.createElement('span');
+      copyIcon.className = 'host-copy-icon';
+      copyIcon.innerHTML = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+
+      hostBtn.append(hostSpan, copyIcon);
+      hostBtn.onclick = (e) => {
+        e.stopPropagation();
+        navigator.clipboard.writeText(fullHost);
+        hostBtn.classList.add('copied');
+        hostSpan.textContent = 'Copied!';
+        setTimeout(() => {
+          hostSpan.textContent = shortHost;
+          hostBtn.classList.remove('copied');
+        }, 1200);
+      };
+      tdHost.appendChild(hostBtn);
+
+      const tdHb = document.createElement('td');
+      tdHb.className = 'session-time-cell';
+      tdHb.textContent = age !== null ? relativeTime(age) : 'unknown';
+      if (lastSeen) tdHb.title = `Last heartbeat: ${new Date(lastSeen * 1000).toLocaleString()}`;
+
+      const tdAction = document.createElement('td');
+      const btn = document.createElement('button');
+      btn.className = 'btn action-btn-sm';
+      btn.textContent = 'Copy SSH';
+      btn.onclick = () => {
+        const cmd = `KERNEL_ID=${kid} ./kssh.sh run "nvidia-smi"`;
+        navigator.clipboard.writeText(cmd);
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy SSH'; }, 1500);
+      };
+      tdAction.appendChild(btn);
+
+      tr.append(tdStatus, tdId, tdGpu, tdCpu, tdRam, tdHost, tdHb, tdAction);
+
+      // 2. Detail Row
+      const detailTr = document.createElement('tr');
+      detailTr.className = 'session-detail-row';
+      detailTr.setAttribute('data-detail-id', kid);
+      detailTr.style.display = expandedKernelIds.has(kid) ? '' : 'none';
+
+      const detailTd = document.createElement('td');
+      detailTd.colSpan = 8;
+
+      const detailWrap = document.createElement('div');
+      detailWrap.className = 'session-detail-content';
+
+      const grid = document.createElement('div');
+      grid.className = 'session-detail-grid';
+
+      const detailFields = [
+        ['Exact CPU', k.cpu || 'N/A'],
+        ['Exact GPU', k.gpu || 'None'],
+        ['RAM', k.ram || 'N/A'],
+        ['Platform / Run Type', k.run_type || plat],
+        ['Notebook', k.notebook || '—'],
+        ['User', k.username || '—'],
+        ['Zone', k.gcp_zone || '—'],
+        ['Container', k.container_name || '—'],
+        ['Tunnel Host', fullHost, 'stat-host-val'],
+        ['Started At', k.created_at ? new Date(k.created_at * 1000).toLocaleString() : '—'],
+        ['Last Heartbeat', lastSeen ? new Date(lastSeen * 1000).toLocaleString() : '—', 'detail-last-heartbeat'],
+      ];
+
+      for (const [lbl, val, cls] of detailFields) {
+        const item = document.createElement('div');
+        item.className = 'detail-item';
+        const l = document.createElement('span');
+        l.className = 'detail-label';
+        l.textContent = lbl;
+        const v = document.createElement('span');
+        v.className = cls ? `detail-val ${cls}` : 'detail-val';
+        v.textContent = val;
+        item.append(l, v);
+        grid.appendChild(item);
+      }
+
+      detailWrap.appendChild(grid);
+      detailTd.appendChild(detailWrap);
+      detailTr.appendChild(detailTd);
+
+      btnToggle.onclick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (expandedKernelIds.has(kid)) {
+          expandedKernelIds.delete(kid);
+          btnToggle.classList.remove('expanded');
+          btnToggle.setAttribute('aria-expanded', 'false');
+          detailTr.style.display = 'none';
+        } else {
+          expandedKernelIds.add(kid);
+          btnToggle.classList.add('expanded');
+          btnToggle.setAttribute('aria-expanded', 'true');
+          detailTr.style.display = '';
+        }
+      };
+
+      return [tr, detailTr];
+    }
+
+    function updateTableRowPair(mainRow, detailRow, k) {
+      const lastSeen = k.updated_at || k.created_at;
+      const age = lastSeen ? (Date.now() / 1000 - lastSeen) : null;
+
+      const badge = mainRow.querySelector('.badge-status');
+      if (badge) updateCardStatus(badge, age);
+
+      const timeCell = mainRow.querySelector('.session-time-cell');
+      if (timeCell) {
+        timeCell.textContent = age !== null ? relativeTime(age) : 'unknown';
+        if (lastSeen) timeCell.title = `Last heartbeat: ${new Date(lastSeen * 1000).toLocaleString()}`;
+      }
+
+      const hostBtn = mainRow.querySelector('.host-click-btn');
+      if (hostBtn && k.hostname) {
+        const fullHost = k.hostname;
+        const shortHost = fullHost.replace(/\.trycloudflare\.com$/i, '');
+        const hostSpan = hostBtn.querySelector('.host-text');
+        if (hostSpan && !hostBtn.classList.contains('copied') && hostSpan.textContent !== shortHost) {
+          hostSpan.textContent = shortHost;
+          hostBtn.title = `Click to copy: ${fullHost}`;
+        }
+      }
+
+      if (detailRow) {
+        const detailHb = detailRow.querySelector('.detail-last-heartbeat');
+        if (detailHb && lastSeen) {
+          detailHb.textContent = new Date(lastSeen * 1000).toLocaleString();
+        }
+        const detailHost = detailRow.querySelector('.stat-host-val');
+        if (detailHost && k.hostname && detailHost.textContent !== k.hostname) {
+          detailHost.textContent = k.hostname;
+        }
+      }
+    }
+
+    function updateCardStatus(badge, age) {
+      if (age !== null && age <= 75) {
+        badge.className = 'badge badge-live badge-status';
+        badge.textContent = '● alive';
+      } else if (age !== null && age <= 180) {
+        badge.className = 'badge badge-stale badge-status';
+        badge.textContent = '● stale';
+      } else {
+        badge.className = 'badge badge-dead badge-status';
+        badge.textContent = '● dead';
+      }
+    }
+
+    function updateSessionCard(card, k) {
+      const lastSeen = k.updated_at || k.created_at;
+      const age = lastSeen ? (Date.now() / 1000 - lastSeen) : null;
+
+      const badge = card.querySelector('.badge-status');
+      if (badge) updateCardStatus(badge, age);
+
+      const time = card.querySelector('.session-time');
+      if (time) {
+        time.textContent = age !== null ? `heartbeat ${relativeTime(age)}` : 'heartbeat unknown';
+        if (lastSeen) time.title = `Last heartbeat: ${new Date(lastSeen * 1000).toLocaleString()}`;
+      }
+
+      const hostVal = card.querySelector('.stat-host-val');
+      if (hostVal && k.hostname && hostVal.textContent !== k.hostname) {
+        hostVal.textContent = k.hostname;
       }
     }
 
@@ -712,6 +1573,7 @@
     function buildSessionCard(k) {
       const card = document.createElement('div');
       card.className = 'session-card';
+      card.setAttribute('data-kernel-id', k.kernel_id || 'default');
 
       const top = document.createElement('div');
       top.className = 'session-top';
@@ -721,18 +1583,23 @@
       id.textContent = k.kernel_id || 'default';
       top.appendChild(id);
 
-      const age = k.created_at ? (Date.now() / 1000 - k.created_at) : null;
+      const lastSeen = k.updated_at || k.created_at;
+      const age = lastSeen ? (Date.now() / 1000 - lastSeen) : null;
       const badge = document.createElement('span');
-      if (age !== null && age < SESSION_TTL / 2) {
-        badge.className = 'badge badge-live';
-        badge.textContent = 'live';
-      } else {
-        badge.className = 'badge badge-stale';
-        badge.textContent = 'stale';
-      }
+      updateCardStatus(badge, age);
       top.appendChild(badge);
 
-      if (k.run_type) {
+      const isColab = (k.container_name && k.container_name.toLowerCase().includes('colab')) ||
+        (k.run_type && k.run_type.toLowerCase().includes('colab')) ||
+        (k.notebook && k.notebook.toLowerCase().includes('colab'));
+      const platName = isColab ? 'Colab' : 'Kaggle';
+      const platIcon = isColab ? ICON_COLAB : ICON_KAGGLE;
+      const plat = document.createElement('span');
+      plat.className = 'badge';
+      plat.innerHTML = `<img src="${platIcon}" class="platform-table-icon" style="vertical-align:-2px;margin-right:4px;"> ${platName}`;
+      top.appendChild(plat);
+
+      if (k.run_type && k.run_type.toLowerCase() !== platName.toLowerCase()) {
         const rt = document.createElement('span');
         rt.className = 'badge';
         rt.textContent = k.run_type;
@@ -744,8 +1611,8 @@
       time.textContent = age !== null
         ? `heartbeat ${relativeTime(age)}`
         : 'heartbeat unknown';
-      if (k.created_at) {
-        time.title = new Date(k.created_at * 1000).toLocaleString();
+      if (lastSeen) {
+        time.title = `Last heartbeat: ${new Date(lastSeen * 1000).toLocaleString()}`;
       }
       top.appendChild(time);
       card.appendChild(top);
@@ -756,19 +1623,23 @@
         ['GPU', k.gpu || 'none'],
         ['CPU', k.cpu || 'unknown'],
         ['RAM', k.ram || 'unknown'],
-        ['Tunnel host', k.hostname || 'unknown'],
+        ['Tunnel host', k.hostname || 'unknown', 'stat-host-val'],
       ];
+      if (k.created_at) {
+        const startAge = Date.now() / 1000 - k.created_at;
+        fields.push(['Started', `${relativeTime(startAge)} (${new Date(k.created_at * 1000).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})})`]);
+      }
       if (k.notebook) fields.push(['Notebook', k.notebook]);
       if (k.username) fields.push(['User', k.username]);
       if (k.gcp_zone) fields.push(['Zone', k.gcp_zone]);
 
-      for (const [label, value] of fields) {
+      for (const [label, value, extraClass] of fields) {
         const item = document.createElement('div');
         const l = document.createElement('span');
         l.className = 'stat-label';
         l.textContent = label;
         const v = document.createElement('span');
-        v.className = 'stat-val';
+        v.className = extraClass ? `stat-val ${extraClass}` : 'stat-val';
         v.textContent = value;
         item.append(l, v);
         stats.appendChild(item);

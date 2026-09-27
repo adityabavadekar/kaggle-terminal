@@ -51,6 +51,10 @@ while [[ $# -gt 0 ]]; do
     KERNEL_ID="$2"
     shift 2
     ;;
+  -k|--key)
+    SSH_KEY="$2"
+    shift 2
+    ;;
   -u|--upload-key)
     KEY_PATH="$HOME/.ssh/kaggle_rsa"
     mkdir -p "$HOME/.ssh"
@@ -123,35 +127,54 @@ import sys, json, datetime
 data = json.load(sys.stdin)
 kernels = data.get("kernels", [])
 if not kernels:
-    print("No active Kaggle sessions found.")
+    print("No active sessions found.")
     sys.exit(0)
 
 clean = lambda v: " ".join(str(v or "").split())
 
-print(f"\n  Active Kaggle Sessions ({len(kernels)})\n")
+print(f"\n  Active Sessions ({len(kernels)})\n")
 for idx, k in enumerate(kernels, 1):
     kid = clean(k.get("kernel_id", "default"))
+    cn = clean(k.get("container_name")).lower()
+    rt = clean(k.get("run_type")).lower()
+    nb = clean(k.get("notebook")).lower()
+    plat = "Colab" if ("colab" in cn or "colab" in rt or "colab" in nb) else "Kaggle"
     user = clean(k.get("username"))
     nb = clean(k.get("notebook"))
     rtype = clean(k.get("run_type")) or "Interactive"
-    gpu = clean(k.get("gpu")) or "None"
+    def format_gpu(g):
+        if not g or g.lower() in ("none", "no gpu", "—", "n/a"): return "None"
+        parts = [p.strip() for p in g.split(",") if p.strip()]
+        if len(parts) >= 4 and len(parts) % 2 == 0:
+            devs = [f"{parts[i]}, {parts[i+1]}" for i in range(0, len(parts), 2)]
+            if len(set(devs)) == 1: return f"{len(devs)}x {devs[0]}"
+        return g
+    gpu = format_gpu(clean(k.get("gpu")))
     cpu = clean(k.get("cpu"))
     ram = clean(k.get("ram"))
     host = clean(k.get("hostname"))
     zone = clean(k.get("gcp_zone"))
 
-    ts = k.get("created_at")
-    time_str = datetime.datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M:%S") if ts else "N/A"
+    ts_start = k.get("created_at")
+    start_str = datetime.datetime.fromtimestamp(ts_start).strftime("%Y-%m-%d %H:%M:%S") if ts_start else "N/A"
+    hb_age = k.get("heartbeat_age_s")
+    if hb_age is None:
+        last_seen = k.get("updated_at") or ts_start
+        if last_seen:
+            hb_age = max(0, int(datetime.datetime.now().timestamp() - float(last_seen)))
+    status = (k.get("status") or ("alive" if hb_age is not None and hb_age <= 75 else "stale")).upper()
+    hb_str = f"{hb_age}s ago" if hb_age is not None else "unknown"
 
-    print(f"  ┌─ [{idx}] {kid} ")
-    if user and user != "N/A": print(f"  │  User    {user} ({rtype})")
-    if nb and nb != "N/A":     print(f"  │  Notebook {nb}")
-    print(f"  │  GPU     {gpu}")
-    if cpu:  print(f"  │  CPU     {cpu}")
-    if ram:  print(f"  │  RAM     {ram}")
-    if zone: print(f"  │  Zone    {zone}")
-    print(f"  │  Tunnel  {host}")
-    print(f"  └─ Since   {time_str}")
+    print(f"  ┌─ [{idx}] {kid} ({plat}) [{status}]")
+    if user and user != "N/A": print(f"  │  User      {user} ({rtype})")
+    if nb and nb != "N/A":     print(f"  │  Notebook  {nb}")
+    print(f"  │  Heartbeat {hb_str}")
+    print(f"  │  GPU       {gpu}")
+    if cpu:  print(f"  │  CPU       {cpu}")
+    if ram:  print(f"  │  RAM       {ram}")
+    if zone: print(f"  │  Zone      {zone}")
+    print(f"  │  Tunnel    {host}")
+    print(f"  └─ Started   {start_str}")
     print()
 '
   exit 0
@@ -223,13 +246,21 @@ kid = clean(k.get("kernel_id", "default"))
 user = clean(k.get("username"))
 nb = clean(k.get("notebook"))
 rtype = clean(k.get("run_type")) or "Interactive"
-gpu = clean(k.get("gpu")) or "None"
+def format_gpu(g):
+    if not g or g.lower() in ("none", "no gpu", "—", "n/a"): return "None"
+    parts = [p.strip() for p in g.split(",") if p.strip()]
+    if len(parts) >= 4 and len(parts) % 2 == 0:
+        devs = [f"{parts[i]}, {parts[i+1]}" for i in range(0, len(parts), 2)]
+        if len(set(devs)) == 1: return f"{len(devs)}x {devs[0]}"
+    return g
+gpu = format_gpu(clean(k.get("gpu")))
 cpu = clean(k.get("cpu"))
 ram = clean(k.get("ram"))
 host = clean(k.get("hostname"))
-zone = clean(k.get("gcp_zone"))
+cn = clean(k.get("container_name")).lower()
+plat = "Colab" if ("colab" in cn or "colab" in rtype.lower() or "colab" in nb.lower()) else "Kaggle"
 
-print(f"  ┌─ Kaggle Session [{kid}]")
+print(f"  ┌─ {plat} Session [{kid}]")
 if nb:   print(f"  │  Notebook  {nb}")
 if user: print(f"  │  User      {user} ({rtype})")
 print(f"  │  GPU       {gpu}")

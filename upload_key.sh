@@ -25,6 +25,8 @@ if [[ $# -gt 0 && "$1" != -* ]]; then
   shift
 fi
 
+KEY_PATH="${KEY_PATH:-$HOME/.ssh/kaggle_rsa}"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
   -r)
@@ -33,6 +35,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   -s)
     RELAY_SECRET="$2"
+    shift 2
+    ;;
+  -k)
+    KEY_PATH="$2"
     shift 2
     ;;
   -*)
@@ -55,7 +61,6 @@ if [[ -z "$RELAY_SECRET" ]]; then
   exit 1
 fi
 
-KEY_PATH="$HOME/.ssh/kaggle_rsa"
 mkdir -p "$HOME/.ssh"
 
 if [[ ! -f "${KEY_PATH}" ]]; then
